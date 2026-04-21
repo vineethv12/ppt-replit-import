@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pictureprefecttones.replit.app/sitemap.xml

@@ -163,18 +163,9 @@ export default function Footer() {
           <div>
             <div
               onClick={() => setLocation("/")}
-              style={{
-                fontFamily: "'Playfair Display', serif",
-                fontSize: "1.6rem",
-                fontStyle: "italic",
-                fontWeight: 600,
-                color: "#F5F1EB",
-                letterSpacing: "0.01em",
-                marginBottom: "1rem",
-                cursor: "pointer",
-              }}
+              style={{ marginBottom: "1rem", cursor: "pointer" }}
             >
-              pictureprefecttones
+              <img src="/logo.png" alt="PicturePerfectTones" style={{ height: "76px", display: "block" }} />
             </div>
 
             <p style={{

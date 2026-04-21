@@ -7,7 +7,7 @@ const LINKS = [
   { label: "Home",    path: "/" },
   { label: "Presets", path: "/shop" },
   { label: "Gallery", path: "/gallery" },
-  { label: "Process", path: "/process" },
+  { label: "YouTube", path: "/process" },
   { label: "About",   path: "/about" },
   { label: "Contact", path: "/contact" },
 ];
@@ -130,9 +130,9 @@ export default function Navbar({ activePath }) {
           <div />
           <button
             onClick={() => navigate("/")}
-            style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'Playfair Display', serif", color: "white", fontSize: "1.875rem", fontWeight: 600, fontStyle: "italic", letterSpacing: "0.025em", textShadow: "0 2px 12px rgba(0,0,0,0.4)" }}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
           >
-            pictureprefecttones
+            <img src="/logo.png" alt="PicturePerfectTones" style={{ height: "70px", display: "block", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.35))" }} />
           </button>
           <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "0.6rem" }}>
             <button
@@ -177,9 +177,9 @@ export default function Navbar({ activePath }) {
       <div className="nav-mobile" style={{ alignItems: "center", justifyContent: "space-between" }}>
         <button
           onClick={() => navigate("/")}
-          style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'Playfair Display', serif", color: "white", fontSize: "1.35rem", fontWeight: 600, fontStyle: "italic", letterSpacing: "0.025em", textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
         >
-          pictureprefecttones
+          <img src="/logo.png" alt="PicturePerfectTones" style={{ height: "48px", display: "block", filter: "drop-shadow(0 1px 6px rgba(0,0,0,0.4))" }} />
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <CartIconBtn cartCount={cartCount} onClick={() => setCartOpen(true)} />

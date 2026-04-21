@@ -4,7 +4,6 @@ import { useSEO } from "../hooks/useSEO";
 import { useLocation } from "wouter";
 import Footer from "../components/Footer";
 import Navbar from "../components/Navbar";
-import { useIsMobile } from "../hooks/useWindowSize";
 import { useCart } from "../context/CartContext";
 import { ShoppingBag } from "lucide-react";
 import { useContent } from "../context/ContentContext";
@@ -74,14 +73,13 @@ const PRODUCTS = [
   },
 ];
 
-const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "wedding", label: "Wedding" },
-  { key: "cinematic", label: "Cinematic" },
-  { key: "warm", label: "Warm" },
-  { key: "moody", label: "Moody" },
-  { key: "portrait", label: "Portrait" },
-];
+const DEFAULT_FILTER_LABELS = {
+  wedding: "Wedding",
+  cinematic: "Cinematic",
+  warm: "Warm",
+  moody: "Moody",
+  portrait: "Portrait",
+};
 
 const cardVariants = {
   hidden: { opacity: 0, y: 24 },
@@ -92,17 +90,16 @@ const cardVariants = {
   }),
 };
 
-function CollectionCard({ product, index }) {
-  const [hovered, setHovered] = useState(false);
+function CollectionCard({ product, index, available }) {
   const [addedAnim, setAddedAnim] = useState(false);
   const [, setLocation] = useLocation();
-  const { isMobile, isTablet } = useIsMobile();
   const { addItem } = useCart();
 
-  const active = hovered || isMobile || isTablet;
+  const isUnavailable = available === false;
 
   const handleAddToCart = (e) => {
     e.stopPropagation();
+    if (isUnavailable) return;
     addItem({ id: product.id, name: product.name, price: product.price, img: product.img });
     setAddedAnim(true);
     setTimeout(() => setAddedAnim(false), 1800);
@@ -117,8 +114,6 @@ function CollectionCard({ product, index }) {
       viewport={{ once: true, margin: "-40px" }}
       style={{ display: "flex", flexDirection: "column", cursor: "pointer" }}
       onClick={() => setLocation("/collection/" + product.id)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {/* Image container — 2:3 ratio */}
       <div
@@ -128,10 +123,7 @@ function CollectionCard({ product, index }) {
           paddingBottom: "150%",
           borderRadius: "16px",
           overflow: "hidden",
-          boxShadow: active
-            ? "0 12px 40px rgba(176,141,91,0.2), 0 4px 16px rgba(0,0,0,0.12)"
-            : "0 4px 20px rgba(0,0,0,0.08)",
-          transition: "box-shadow 500ms ease",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
         }}
       >
         {/* Image */}
@@ -145,12 +137,6 @@ function CollectionCard({ product, index }) {
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            filter: active
-              ? "saturate(1.05) brightness(1) contrast(1)"
-              : "saturate(0.48) brightness(0.84) contrast(0.88)",
-            transform: active ? "scale(1.04)" : "scale(1)",
-            transition:
-              "filter 800ms cubic-bezier(0.4,0,0.2,1), transform 700ms cubic-bezier(0.25,1,0.5,1)",
           }}
         />
 
@@ -159,20 +145,19 @@ function CollectionCard({ product, index }) {
           style={{
             position: "absolute",
             inset: 0,
-            background:
-              "linear-gradient(to top, rgba(0,0,0,0.22) 0%, transparent 40%)",
+            background: "linear-gradient(to top, rgba(0,0,0,0.22) 0%, transparent 40%)",
             borderRadius: "16px",
           }}
         />
 
-        {/* Badge */}
-        {product.badge && (
+        {/* Badge — "Coming Soon" overrides product badge when unavailable */}
+        {(isUnavailable || product.badge) && (
           <div
             style={{
               position: "absolute",
               top: "12px",
               left: "12px",
-              background: "#B08D5B",
+              background: isUnavailable ? "rgba(44,40,37,0.75)" : "#B08D5B",
               color: "white",
               fontSize: "0.52rem",
               letterSpacing: "0.26em",
@@ -181,43 +166,12 @@ function CollectionCard({ product, index }) {
               borderRadius: "9999px",
               fontFamily: "'DM Sans', sans-serif",
               fontWeight: 700,
+              backdropFilter: isUnavailable ? "blur(4px)" : "none",
             }}
           >
-            {product.badge}
+            {isUnavailable ? "Coming Soon" : product.badge}
           </div>
         )}
-
-        {/* Preset phase indicator */}
-        <div
-          style={{
-            position: "absolute",
-            top: "12px",
-            right: "12px",
-            opacity: 0.85,
-            transition: "opacity 300ms",
-          }}
-        >
-          <span
-            style={{
-              background: "rgba(0,0,0,0.35)",
-              backdropFilter: "blur(6px)",
-              color: active ? "rgba(201,169,110,0.95)" : "rgba(255,255,255,0.55)",
-              fontSize: "0.5rem",
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              padding: "0.2rem 0.5rem",
-              borderRadius: "9999px",
-              border: active
-                ? "1px solid rgba(201,169,110,0.35)"
-                : "1px solid rgba(255,255,255,0.12)",
-              fontFamily: "'DM Sans', sans-serif",
-              transition: "all 600ms ease",
-              display: "block",
-            }}
-          >
-            {active ? "After" : "Before"}
-          </span>
-        </div>
 
         {/* "View Collection" overlay — always visible */}
         <div
@@ -306,6 +260,8 @@ function CollectionCard({ product, index }) {
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <button
             onClick={handleAddToCart}
+            disabled={isUnavailable}
+            data-testid={`button-add-to-cart-${product.id}`}
             style={{
               flex: 1,
               display: "flex",
@@ -313,10 +269,10 @@ function CollectionCard({ product, index }) {
               justifyContent: "center",
               gap: "0.4rem",
               padding: "0.6rem 0.75rem",
-              background: addedAnim ? "#2C2825" : "rgba(44,40,37,0.06)",
-              color: addedAnim ? "#F5EDE0" : "#5A544D",
-              border: addedAnim ? "1px solid #2C2825" : "1px solid rgba(44,40,37,0.12)",
-              cursor: "pointer",
+              background: isUnavailable ? "rgba(44,40,37,0.04)" : addedAnim ? "#2C2825" : "rgba(44,40,37,0.06)",
+              color: isUnavailable ? "#C4BAB1" : addedAnim ? "#F5EDE0" : "#5A544D",
+              border: isUnavailable ? "1px solid rgba(44,40,37,0.08)" : addedAnim ? "1px solid #2C2825" : "1px solid rgba(44,40,37,0.12)",
+              cursor: isUnavailable ? "not-allowed" : "pointer",
               fontSize: "0.6rem",
               letterSpacing: "0.16em",
               textTransform: "uppercase",
@@ -325,11 +281,11 @@ function CollectionCard({ product, index }) {
               borderRadius: "4px",
               transition: "all 220ms ease",
             }}
-            onMouseEnter={e => { if (!addedAnim) { e.currentTarget.style.background = "#2C2825"; e.currentTarget.style.color = "#F5EDE0"; e.currentTarget.style.borderColor = "#2C2825"; } }}
-            onMouseLeave={e => { if (!addedAnim) { e.currentTarget.style.background = "rgba(44,40,37,0.06)"; e.currentTarget.style.color = "#5A544D"; e.currentTarget.style.borderColor = "rgba(44,40,37,0.12)"; } }}
+            onMouseEnter={e => { if (!addedAnim && !isUnavailable) { e.currentTarget.style.background = "#2C2825"; e.currentTarget.style.color = "#F5EDE0"; e.currentTarget.style.borderColor = "#2C2825"; } }}
+            onMouseLeave={e => { if (!addedAnim && !isUnavailable) { e.currentTarget.style.background = "rgba(44,40,37,0.06)"; e.currentTarget.style.color = "#5A544D"; e.currentTarget.style.borderColor = "rgba(44,40,37,0.12)"; } }}
           >
             <ShoppingBag size={12} strokeWidth={1.8} />
-            {addedAnim ? "Added ✓" : "Add to Cart"}
+            {isUnavailable ? "Coming Soon" : addedAnim ? "Added ✓" : "Add to Cart"}
           </button>
         </div>
       </div>
@@ -341,15 +297,25 @@ function CollectionCard({ product, index }) {
 export default function ShopPage() {
   useSEO({
     title: "Shop Presets — pictureprefecttones",
-    description: "Browse the full pictureprefecttones collection. Luxury Lightroom preset packs designed for Indian wedding photographers — instant download, XMP + DNG formats.",
+    description: "Browse the full pictureprefecttones collection. Luxury Lightroom preset packs designed for Indian wedding photographers — instant download, XMP format.",
     path: "/shop",
   });
-  const { content } = useContent();
+  const { content, availablePresets } = useContent();
   const [, setLocation] = useLocation();
   const [activeFilter, setActiveFilter] = useState("all");
 
-  const allProducts = content.products || PRODUCTS;
-  const filtered = allProducts.filter((p) => p.categories.includes(activeFilter));
+  const fl = { ...DEFAULT_FILTER_LABELS, ...(content.filterLabels || {}) };
+  const FILTERS = [
+    { key: "all",       label: "All" },
+    { key: "wedding",   label: fl.wedding },
+    { key: "cinematic", label: fl.cinematic },
+    { key: "warm",      label: fl.warm },
+    { key: "moody",     label: fl.moody },
+    { key: "portrait",  label: fl.portrait },
+  ];
+
+  const allProducts = (content.products || PRODUCTS).filter(p => p.enabled !== false);
+  const filtered = allProducts.filter((p) => (p.categories || ["all"]).includes(activeFilter));
 
   return (
     <div style={{ minHeight: "100vh", background: "#F5F1EB", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden" }}>
@@ -488,7 +454,12 @@ export default function ShopPage() {
               className="shop-grid"
             >
               {filtered.map((product, i) => (
-                <CollectionCard key={product.id} product={product} index={i} />
+                <CollectionCard
+                  key={product.id}
+                  product={product}
+                  index={i}
+                  available={availablePresets === null ? undefined : availablePresets.has(product.id)}
+                />
               ))}
             </motion.div>
           ) : (

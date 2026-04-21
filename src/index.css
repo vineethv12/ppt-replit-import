@@ -156,11 +156,17 @@ img {
 .video-modal-grid {
   position: relative;
   width: 100%;
-  max-width: 1180px;
+  max-width: 1100px;
   display: grid;
-  grid-template-columns: 1fr 290px;
+  grid-template-columns: 1fr 270px;
   gap: 1rem;
-  align-items: stretch;
+  align-items: start;
+}
+
+.video-modal-sidebar {
+  max-height: calc(100vh - 3.5rem);
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 
 .hero-content {
@@ -256,8 +262,8 @@ img {
     gap: 1.5rem !important;
   }
   .about-steps-line { display: none !important; }
-  .video-modal-grid { grid-template-columns: 1fr !important; max-width: 640px !important; }
-  .video-modal-sidebar { display: none !important; }
+  .video-modal-grid { grid-template-columns: 1fr !important; max-width: 680px !important; }
+  .video-modal-sidebar { max-height: 220px !important; flex-direction: row !important; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; }
 }
 
 /* ── Mobile (< 640px) ───────────────────────────────────────── */
@@ -344,6 +350,20 @@ img {
   70%       { opacity: 0.03;  transform: translate(-1px, -1px); }
   80%       { opacity: 0.045; transform: translate(1px, 2px); }
   90%       { opacity: 0.025; transform: translate(-2px, -1px); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes progressIndeterminate {
+  0%   { transform: translateX(-100%); width: 40%; }
+  50%  { transform: translateX(100%);  width: 60%; }
+  100% { transform: translateX(300%);  width: 40%; }
+}
+
+.gallery-card:hover .gallery-overlay {
+  opacity: 1 !important;
 }
 
 .hero-grain {

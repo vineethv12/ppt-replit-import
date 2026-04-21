@@ -174,11 +174,11 @@ const FAQS = [
   },
   {
     q: "Which versions of Lightroom are compatible?",
-    a: "Our presets work seamlessly with Adobe Lightroom Classic, Lightroom CC (desktop), and Lightroom Mobile. We provide both .XMP and .DNG formats so you're covered regardless of which version you use.",
+    a: "Our presets work seamlessly with Adobe Lightroom Classic, Lightroom CC (desktop), and Lightroom Mobile. We provide .XMP files which are compatible across all versions.",
   },
   {
     q: "Can I use these presets on my phone?",
-    a: "Yes. Every collection includes .DNG files which you can import directly into the free Lightroom Mobile app on both iOS and Android. Full editing power — no desktop required.",
+    a: "Yes. Our .XMP presets work with the free Lightroom Mobile app on both iOS and Android. Full editing power — no desktop required.",
   },
   {
     q: "Will the presets look exactly the same on my photos?",
@@ -186,7 +186,7 @@ const FAQS = [
   },
   {
     q: "How do I install the presets after purchasing?",
-    a: "After purchase, you'll receive a download link with a step-by-step installation guide. In Lightroom Classic, simply import the .XMP files into your Presets panel. For mobile, import the .DNG files directly into the app. The whole process takes under 5 minutes.",
+    a: "After purchase, you'll receive a download link with a step-by-step installation guide. Simply import the .XMP files into Lightroom's Presets panel — on desktop or mobile. The whole process takes under 5 minutes.",
   },
   {
     q: "Do I receive updates if you improve a collection?",
@@ -503,25 +503,25 @@ function CinematicTestimonial() {
 }
 
 const ROW1_CARDS = [
-  { src: "/images/photo-1.webp", alt: "Couple ceremony",  rotate: "-2deg",  h: "280px" },
-  { src: "/images/photo-2.jpg",  alt: "Bride lehenga",    rotate: "1.5deg", h: "320px" },
-  { src: "/images/photo-3.jpg",  alt: "Beach ceremony",   rotate: "-1deg",  h: "290px" },
-  { src: "/images/photo-4.jpg",  alt: "Bride in saree",   rotate: "2deg",   h: "300px" },
-  { src: "/images/photo-5.jpg",  alt: "Couple corridor",  rotate: "-1.5deg",h: "310px" },
-  { src: "/images/photo-6.jpg",  alt: "Couple suite",     rotate: "1.8deg", h: "290px" },
-  { src: "/images/photo-7.jpg",  alt: "Bride mirror",     rotate: "-2.2deg",h: "300px" },
-  { src: "/images/photo-8.jpg",  alt: "Bride seated",     rotate: "1.2deg", h: "280px" },
+  { src: "/images/gallery-1.jpg",  alt: "Wedding photo 1",  rotate: "-2deg",  h: "280px" },
+  { src: "/images/gallery-2.jpg",  alt: "Wedding photo 2",  rotate: "1.5deg", h: "320px" },
+  { src: "/images/gallery-3.jpg",  alt: "Wedding photo 3",  rotate: "-1deg",  h: "290px" },
+  { src: "/images/gallery-4.jpg",  alt: "Wedding photo 4",  rotate: "2deg",   h: "300px" },
+  { src: "/images/gallery-5.jpg",  alt: "Wedding photo 5",  rotate: "-1.5deg",h: "310px" },
+  { src: "/images/gallery-6.jpg",  alt: "Wedding photo 6",  rotate: "1.8deg", h: "290px" },
+  { src: "/images/gallery-7.jpg",  alt: "Wedding photo 7",  rotate: "-2.2deg",h: "300px" },
+  { src: "/images/gallery-8.jpg",  alt: "Wedding photo 8",  rotate: "1.2deg", h: "280px" },
 ];
 
 const ROW2_CARDS = [
-  { src: "/images/photo-5.jpg",  alt: "Couple corridor",  rotate: "2deg",   h: "240px" },
-  { src: "/images/photo-7.jpg",  alt: "Bride mirror",     rotate: "-1.2deg",h: "260px" },
-  { src: "/images/photo-1.webp", alt: "Couple ceremony",  rotate: "1.5deg", h: "240px" },
-  { src: "/images/photo-8.jpg",  alt: "Bride seated",     rotate: "-2deg",  h: "255px" },
-  { src: "/images/photo-3.jpg",  alt: "Beach ceremony",   rotate: "1.8deg", h: "245px" },
-  { src: "/images/photo-6.jpg",  alt: "Couple suite",     rotate: "-1.5deg",h: "250px" },
-  { src: "/images/photo-2.jpg",  alt: "Bride lehenga",    rotate: "2.2deg", h: "260px" },
-  { src: "/images/photo-4.jpg",  alt: "Bride in saree",   rotate: "-1deg",  h: "240px" },
+  { src: "/images/gallery-9.jpg",  alt: "Wedding photo 9",  rotate: "2deg",   h: "240px" },
+  { src: "/images/gallery-10.jpg", alt: "Wedding photo 10", rotate: "-1.2deg",h: "260px" },
+  { src: "/images/gallery-11.jpg", alt: "Wedding photo 11", rotate: "1.5deg", h: "240px" },
+  { src: "/images/gallery-12.jpg", alt: "Wedding photo 12", rotate: "-2deg",  h: "255px" },
+  { src: "/images/gallery-13.jpg", alt: "Wedding photo 13", rotate: "1.8deg", h: "245px" },
+  { src: "/images/gallery-14.jpg", alt: "Wedding photo 14", rotate: "-1.5deg",h: "250px" },
+  { src: "/images/gallery-15.jpg", alt: "Wedding photo 15", rotate: "2.2deg", h: "260px" },
+  { src: "/images/gallery-16.jpg", alt: "Wedding photo 16", rotate: "-1deg",  h: "240px" },
 ];
 
 const COLLECTIONS_FALLBACK = [
@@ -532,7 +532,7 @@ const COLLECTIONS_FALLBACK = [
     mood: ["Soft", "Ethereal", "Luminous"],
     tagline: "For stories told in whispers and light.",
     description: "Film-like luminosity for photographers who live for soft candlelight and intimate moments. Skin tones glow, whites stay clean, and every frame feels like it was shot on medium format.",
-    includes: ["12 Lightroom Presets", "Mobile DNG Profiles", "One-Click Apply", "Free Lifetime Updates"],
+    includes: ["12 Lightroom Presets", "Lightroom Mobile Compatible", "One-Click Apply", "Free Lifetime Updates"],
     price: "₹3,999",
     images: {
       hero: "/images/c-ivory-bride.jpg",
@@ -550,7 +550,7 @@ const COLLECTIONS_FALLBACK = [
     mood: ["Dramatic", "Regal", "Bold"],
     tagline: "Where every frame commands the room.",
     description: "Built for the richness of traditional Indian ceremonies. Deep reds stay true, gold embroidery gleams, and the grandeur of a lehenga fills every corner of the frame.",
-    includes: ["14 Lightroom Presets", "Camera Raw Profiles", "Mobile DNG Profiles", "Wedding Day Workflow Guide"],
+    includes: ["14 Lightroom Presets", "Camera Raw Profiles", "Lightroom Mobile Compatible", "Wedding Day Workflow Guide"],
     price: "₹4,499",
     images: {
       hero: "/images/c-red-twirl.jpg",
@@ -670,7 +670,7 @@ function CollectionPreviewModal({ collection, onClose }) {
 
   const goTo = idx => setImgIdx((idx + images.length) % images.length);
 
-  const beforeFilter = "saturate(0.5) brightness(0.82) contrast(0.88)";
+  const beforeFilter = "none";
   const afterFilter  = "saturate(1.05) brightness(1) contrast(1)";
 
   return (
@@ -868,7 +868,7 @@ function PresetCollection() {
       {/* Collections */}
       {COLLECTIONS.map((col, idx) => (
         <motion.div
-          key={col.num}
+          key={col.id || col.num || idx}
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
@@ -912,8 +912,8 @@ function PresetCollection() {
 
               {/* Mood tags */}
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1.75rem" }}>
-                {col.mood.map(m => (
-                  <span key={m} style={{
+                {col.mood.map((m, i) => (
+                  <span key={`${m}-${i}`} style={{
                     border: "1px solid rgba(176,141,91,0.3)",
                     color: "rgba(176,141,91,0.8)",
                     fontSize: "0.62rem",
@@ -935,8 +935,8 @@ function PresetCollection() {
               <div style={{ marginBottom: "2.5rem" }}>
                 <p style={{ color: "rgba(176,141,91,0.6)", fontSize: "0.6rem", letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: "0.75rem", fontFamily: "'DM Sans', sans-serif" }}>What's Included</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  {col.includes.map(item => (
-                    <div key={item} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  {col.includes.map((item, i) => (
+                    <div key={`${item}-${i}`} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                       <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#B08D5B", flexShrink: 0 }} />
                       <span style={{ color: "rgba(232,223,208,0.75)", fontSize: "0.825rem", letterSpacing: "0.05em", fontWeight: 300 }}>{item}</span>
                     </div>
@@ -1057,13 +1057,13 @@ function PresetCollection() {
   );
 }
 
-const ROW1_DOUBLED = [...ROW1_CARDS, ...ROW1_CARDS];
-const ROW2_DOUBLED = [...ROW2_CARDS, ...ROW2_CARDS];
+const ROW1_DOUBLED = [...ROW1_CARDS, ...ROW1_CARDS, ...ROW1_CARDS, ...ROW1_CARDS];
+const ROW2_DOUBLED = [...ROW2_CARDS, ...ROW2_CARDS, ...ROW2_CARDS, ...ROW2_CARDS];
 
 export default function LandingPage() {
   useSEO({
     title: "pictureprefecttones — Luxury Lightroom Presets for Indian Wedding Photographers",
-    description: "Premium Lightroom preset collections crafted exclusively for Indian wedding photographers. Cinematic colour grades for every skin tone, ceremony, and light condition. Instant download — XMP + DNG.",
+    description: "Premium Lightroom preset collections crafted exclusively for Indian wedding photographers. Cinematic colour grades for every skin tone, ceremony, and light condition. Instant download — XMP.",
     path: "/",
   });
   const { content } = useContent();
@@ -1099,12 +1099,12 @@ export default function LandingPage() {
         .marquee-track-left {
           display: flex;
           width: max-content;
-          animation: marquee-left 55s linear infinite;
+          animation: marquee-left 110s linear infinite;
         }
         .marquee-track-right {
           display: flex;
           width: max-content;
-          animation: marquee-right 70s linear infinite;
+          animation: marquee-right 140s linear infinite;
         }
         .marquee-track-left:hover,
         .marquee-track-right:hover { animation-play-state: paused; }

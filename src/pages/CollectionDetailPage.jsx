@@ -60,7 +60,7 @@ function CollectionCartBtn() {
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
-const BEFORE_FILTER = "saturate(0.42) brightness(0.82) contrast(0.88)";
+const BEFORE_FILTER = "none";
 
 const COLLECTION_DATA = {
   ivory: {
@@ -71,7 +71,7 @@ const COLLECTION_DATA = {
     badge: null,
     style: "Soft · Warm · Luminous",
     count: 12,
-    format: "XMP + DNG",
+    format: "XMP",
     compat: "Lightroom Mobile & Desktop",
     hero: "/images/c-ivory-bride.jpg",
     pairs: [
@@ -96,7 +96,7 @@ const COLLECTION_DATA = {
     badge: "Bestseller",
     style: "Dramatic · Regal · Moody",
     count: 14,
-    format: "XMP + DNG",
+    format: "XMP",
     compat: "Lightroom Mobile & Desktop",
     hero: "/images/c-red-twirl.jpg",
     pairs: [
@@ -121,7 +121,7 @@ const COLLECTION_DATA = {
     badge: "New",
     style: "Cinematic · Warm · Timeless",
     count: 16,
-    format: "XMP + DNG",
+    format: "XMP",
     compat: "Lightroom Mobile & Desktop",
     hero: "/images/c-sofa-bride.jpg",
     pairs: [
@@ -146,7 +146,7 @@ const COLLECTION_DATA = {
     badge: null,
     style: "Vivid · Joyful · Radiant",
     count: 10,
-    format: "XMP + DNG",
+    format: "XMP",
     compat: "Lightroom Mobile & Desktop",
     hero: "/images/c-celebration.jpg",
     pairs: [
@@ -171,7 +171,7 @@ const COLLECTION_DATA = {
     badge: null,
     style: "Warm · Glowing · Sunlit",
     count: 12,
-    format: "XMP + DNG",
+    format: "XMP",
     compat: "Lightroom Mobile & Desktop",
     hero: "/images/c-garden-couple.jpg",
     pairs: [
@@ -196,7 +196,7 @@ const COLLECTION_DATA = {
     badge: null,
     style: "Clean · Natural · Faithful",
     count: 8,
-    format: "XMP + DNG",
+    format: "XMP",
     compat: "Lightroom Mobile & Desktop",
     hero: "/images/c-ivory-couple.jpg",
     pairs: [
@@ -344,12 +344,17 @@ export default function CollectionDetailPage() {
   const [addedAnim, setAddedAnim] = useState(false);
   const { isMobile, isTablet } = useIsMobile();
   const { addItem } = useCart();
-  const { content } = useContent();
+  const { content, availablePresets } = useContent();
 
   const col = (content.collectionData || COLLECTION_DATA)[id];
 
+  const validPairs = (col?.pairs || []).filter(p => p.before || p.after || p.img);
+  const validGallery = (col?.gallery || []).filter(src => typeof src === "string" && src.trim() !== "");
+
+  const isUnavailable = availablePresets !== null && !availablePresets.has(id);
+
   const handleAddToCart = () => {
-    if (!col) return;
+    if (!col || isUnavailable) return;
     addItem({ id, name: col.name, price: col.price, img: col.hero });
     setAddedAnim(true);
     setTimeout(() => setAddedAnim(false), 1800);
@@ -357,7 +362,7 @@ export default function CollectionDetailPage() {
 
   useSEO({
     title: col ? `${col.name} — pictureprefecttones` : "Collection — pictureprefecttones",
-    description: col ? `${col.tagline}. ${col.count} Lightroom presets for Indian wedding photography. ${col.style}. Instant download — XMP + DNG.` : "Premium Lightroom preset collection for Indian wedding photographers.",
+    description: col ? `${col.tagline}. ${col.count} Lightroom presets for Indian wedding photography. ${col.style}. Instant download — XMP.` : "Premium Lightroom preset collection for Indian wedding photographers.",
     path: `/collection/${id}`,
   });
 
@@ -396,8 +401,8 @@ export default function CollectionDetailPage() {
           </svg>
           All Collections
         </button>
-        <span onClick={() => setLocation("/")} style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.4rem", fontStyle: "italic", fontWeight: 600, color: "#2C2825", cursor: "pointer" }}>
-          pictureprefecttones
+        <span onClick={() => setLocation("/")} style={{ cursor: "pointer" }}>
+          <img src="/logo.png" alt="PicturePerfectTones" style={{ height: "52px", display: "block", filter: "invert(1)" }} />
         </span>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <CollectionCartBtn />
@@ -417,9 +422,9 @@ export default function CollectionDetailPage() {
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", animation: "kb-detail 12s ease-in-out infinite alternate" }}
             />
           </div>
-          {col.badge && (
-            <div style={{ position: "absolute", top: "1.25rem", left: "1.25rem", background: "#B08D5B", color: "white", fontSize: "0.55rem", letterSpacing: "0.28em", textTransform: "uppercase", padding: "0.28rem 0.72rem", borderRadius: "9999px", fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>
-              {col.badge}
+          {(isUnavailable || col.badge) && (
+            <div style={{ position: "absolute", top: "1.25rem", left: "1.25rem", background: isUnavailable ? "rgba(44,40,37,0.78)" : "#B08D5B", color: "white", fontSize: "0.55rem", letterSpacing: "0.28em", textTransform: "uppercase", padding: "0.28rem 0.72rem", borderRadius: "9999px", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, backdropFilter: isUnavailable ? "blur(4px)" : "none" }}>
+              {isUnavailable ? "Coming Soon" : col.badge}
             </div>
           )}
         </motion.div>
@@ -453,19 +458,49 @@ export default function CollectionDetailPage() {
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
             <button
               onClick={handleAddToCart}
-              style={{ padding: "1rem 2.5rem", background: "#2C2825", color: "#F5EDE0", border: "none", cursor: "pointer", fontSize: "0.72rem", letterSpacing: "0.18em", textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, borderRadius: "2px", transition: "background 250ms" }}
-              onMouseEnter={e => e.currentTarget.style.background = "#B08D5B"}
-              onMouseLeave={e => e.currentTarget.style.background = "#2C2825"}
+              disabled={isUnavailable}
+              data-testid={`button-buy-now-${id}`}
+              style={{
+                padding: "1rem 2.5rem",
+                background: isUnavailable ? "rgba(44,40,37,0.08)" : "#2C2825",
+                color: isUnavailable ? "#C4BAB1" : "#F5EDE0",
+                border: "none",
+                cursor: isUnavailable ? "not-allowed" : "pointer",
+                fontSize: "0.72rem",
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 600,
+                borderRadius: "2px",
+                transition: "background 250ms",
+              }}
+              onMouseEnter={e => { if (!isUnavailable) e.currentTarget.style.background = "#B08D5B"; }}
+              onMouseLeave={e => { if (!isUnavailable) e.currentTarget.style.background = "#2C2825"; }}
             >
-              Buy Now
+              {isUnavailable ? "Coming Soon" : "Buy Now"}
             </button>
             <button
               onClick={handleAddToCart}
-              style={{ padding: "1rem 2rem", background: addedAnim ? "#2C2825" : "transparent", color: addedAnim ? "#F5EDE0" : "#2C2825", border: addedAnim ? "1px solid #2C2825" : "1px solid rgba(44,40,37,0.25)", cursor: "pointer", fontSize: "0.72rem", letterSpacing: "0.18em", textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif", fontWeight: 500, borderRadius: "2px", transition: "all 250ms" }}
-              onMouseEnter={e => { if (!addedAnim) { e.currentTarget.style.background = "#2C2825"; e.currentTarget.style.color = "#F5EDE0"; } }}
-              onMouseLeave={e => { if (!addedAnim) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#2C2825"; } }}
+              disabled={isUnavailable}
+              data-testid={`button-add-to-cart-${id}`}
+              style={{
+                padding: "1rem 2rem",
+                background: isUnavailable ? "transparent" : addedAnim ? "#2C2825" : "transparent",
+                color: isUnavailable ? "#C4BAB1" : addedAnim ? "#F5EDE0" : "#2C2825",
+                border: isUnavailable ? "1px solid rgba(44,40,37,0.12)" : addedAnim ? "1px solid #2C2825" : "1px solid rgba(44,40,37,0.25)",
+                cursor: isUnavailable ? "not-allowed" : "pointer",
+                fontSize: "0.72rem",
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 500,
+                borderRadius: "2px",
+                transition: "all 250ms",
+              }}
+              onMouseEnter={e => { if (!addedAnim && !isUnavailable) { e.currentTarget.style.background = "#2C2825"; e.currentTarget.style.color = "#F5EDE0"; } }}
+              onMouseLeave={e => { if (!addedAnim && !isUnavailable) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#2C2825"; } }}
             >
-              {addedAnim ? "✓ Added to Cart" : "Add to Cart"}
+              {isUnavailable ? "Coming Soon" : addedAnim ? "✓ Added to Cart" : "Add to Cart"}
             </button>
           </div>
 
@@ -493,7 +528,7 @@ export default function CollectionDetailPage() {
       <section style={{ background: "#EDEAE4", padding: "5rem 0 2rem" }}>
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
 
-          {/* Header — matches homepage Transformation section exactly */}
+          {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -511,7 +546,7 @@ export default function CollectionDetailPage() {
               <div style={{ height: "1px", width: "3rem", background: "rgba(176,141,91,0.4)" }} />
             </div>
 
-            {/* Mode toggle — identical to homepage */}
+            {/* Mode toggle */}
             <div style={{ display: "inline-flex", background: "rgba(44,40,37,0.07)", borderRadius: "9999px", padding: "4px", marginBottom: "1.25rem", gap: "2px" }}>
               {[
                 { id: "slider", label: "⟺  Slider" },
@@ -546,17 +581,22 @@ export default function CollectionDetailPage() {
             </p>
           </motion.div>
 
-          {/* ba-grid — same class as homepage (repeat(3,1fr) → 2col → 1col) */}
-          <div className="ba-grid">
-            {col.pairs.map((pair, i) => (
-              <SliderPair key={i} before={pair.before || pair.img} after={pair.after || pair.img} mode={revealMode} />
-            ))}
-          </div>
+          {/* ba-grid or empty message */}
+          {validPairs.length > 0 ? (
+            <div className="ba-grid">
+              {validPairs.map((pair, i) => (
+                <SliderPair key={i} before={pair.before || pair.img} after={pair.after || pair.img} mode={revealMode} />
+              ))}
+            </div>
+          ) : (
+            <p style={{ textAlign: "center", color: "#9A9189", fontFamily: "'DM Sans', sans-serif", fontSize: "0.85rem", padding: "3rem 0" }}>
+              No before/after images yet.
+            </p>
+          )}
 
           <div style={{ height: "4rem" }} />
         </div>
       </section>
-
 
       {/* ── GALLERY ───────────────────────────────────────── */}
       <section style={{ background: "#EDEAE4", padding: "2rem 0 5rem" }}>
@@ -570,30 +610,31 @@ export default function CollectionDetailPage() {
             </h2>
           </motion.div>
 
-          <div style={{ columns: "auto 240px", columnGap: "10px" }}>
-            {(col.gallery || []).map((src, i) => (
-              <motion.div
-                key={i}
-                variants={fadeUp} custom={i * 0.05} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
-                style={{ breakInside: "avoid", marginBottom: "10px", borderRadius: "8px", overflow: "hidden" }}
-              >
-                <img
-                  src={src}
-                  alt=""
-                  draggable={false}
-                  loading="lazy"
-                  style={{ width: "100%", display: "block", objectFit: "cover", transition: "transform 600ms cubic-bezier(0.22,1,0.36,1)" }}
-                  onMouseEnter={e => e.currentTarget.style.transform = "scale(1.04)"}
-                  onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-                />
-              </motion.div>
-            ))}
-            {(col.gallery || []).length === 0 && (
-              <p style={{ textAlign: "center", color: "#9A9189", fontFamily: "'DM Sans', sans-serif", fontSize: "0.85rem", padding: "3rem 0" }}>
-                No gallery images yet.
-              </p>
-            )}
-          </div>
+          {validGallery.length > 0 ? (
+            <div style={{ columns: "auto 240px", columnGap: "10px" }}>
+              {validGallery.map((src, i) => (
+                <motion.div
+                  key={i}
+                  variants={fadeUp} custom={i * 0.05} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
+                  style={{ breakInside: "avoid", marginBottom: "10px", borderRadius: "8px", overflow: "hidden" }}
+                >
+                  <img
+                    src={src}
+                    alt=""
+                    draggable={false}
+                    loading="lazy"
+                    style={{ width: "100%", display: "block", objectFit: "cover", transition: "transform 600ms cubic-bezier(0.22,1,0.36,1)" }}
+                    onMouseEnter={e => e.currentTarget.style.transform = "scale(1.04)"}
+                    onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ textAlign: "center", color: "#9A9189", fontFamily: "'DM Sans', sans-serif", fontSize: "0.85rem", padding: "3rem 0" }}>
+              No gallery images yet.
+            </p>
+          )}
         </div>
       </section>
 
@@ -612,7 +653,7 @@ export default function CollectionDetailPage() {
           {col.count} presets · {col.price} · Instant download
         </p>
         <p style={{ color: "#B8AFA6", fontSize: "0.72rem", fontWeight: 300, marginBottom: "2.75rem" }}>
-          Lightroom Mobile &amp; Desktop · XMP + DNG
+          Lightroom Mobile &amp; Desktop · XMP
         </p>
 
         <div style={{ display: "flex", gap: "0.85rem", justifyContent: "center", flexWrap: "wrap" }}>

@@ -178,55 +178,97 @@ function VideoModal({ videoId, onClose, videos = [] }) {
   }, [onClose]);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(20,17,14,0.92)", backdropFilter: "blur(14px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
-      <motion.div initial={{ scale: 0.94, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.94, opacity: 0 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} onClick={e => e.stopPropagation()}
-        className="video-modal-grid">
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(14,11,9,0.95)", backdropFilter: "blur(18px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "1.25rem",
+      }}
+    >
+      {/* ── Close button — always visible top-right of backdrop ── */}
+      <button
+        onClick={onClose}
+        style={{
+          position: "absolute", top: "1rem", right: "1rem",
+          background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)",
+          color: "white", borderRadius: "50%", width: "40px", height: "40px",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", zIndex: 10, backdropFilter: "blur(8px)",
+          transition: "background 200ms",
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+        onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+      >
+        <X size={16} />
+      </button>
 
+      {/* ── Modal content ── */}
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.94, opacity: 0 }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        onClick={e => e.stopPropagation()}
+        className="video-modal-grid"
+      >
         {/* ── Main player ── */}
-        <div style={{ borderRadius: "10px", overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column" }}>
-          <div style={{ aspectRatio: "16/9", position: "relative", flexShrink: 0 }}>
-            <iframe key={activeId} src={`https://www.youtube.com/embed/${extractYouTubeId(activeId)}?autoplay=1&rel=0`} title="Video"
-              allow="autoplay; fullscreen" style={{ width: "100%", height: "100%", border: "none", display: "block" }} />
+        <div style={{ borderRadius: "12px", overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.7)", display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div style={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
+            <iframe
+              key={activeId}
+              src={`https://www.youtube.com/embed/${extractYouTubeId(activeId)}?autoplay=1&rel=0&modestbranding=1`}
+              title={activeVideo?.title || "Video"}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              allowFullScreen
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none", display: "block" }}
+            />
           </div>
           {activeVideo && (
-            <div style={{ background: "#1C1814", padding: "0.85rem 1rem", flexGrow: 1 }}>
-              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "1rem", color: "#F5F1EB", lineHeight: 1.35 }}>{activeVideo.title}</p>
-              <p style={{ color: "rgba(245,241,235,0.45)", fontSize: "0.7rem", marginTop: "0.3rem", fontFamily: "'DM Sans', sans-serif" }}>{activeVideo.desc}</p>
+            <div style={{ background: "#1A1612", padding: "0.9rem 1.1rem" }}>
+              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "0.95rem", color: "#F5F1EB", lineHeight: 1.4, marginBottom: "0.3rem" }}>{activeVideo.title}</p>
+              <p style={{ color: "rgba(245,241,235,0.42)", fontSize: "0.68rem", fontFamily: "'DM Sans', sans-serif" }}>{activeVideo.desc}</p>
             </div>
           )}
         </div>
 
         {/* ── Suggestions sidebar ── */}
-        <div className="video-modal-sidebar" style={{ display: "flex", flexDirection: "column", gap: "0.65rem", overflowY: "auto", scrollbarWidth: "none", background: "#111", borderRadius: "10px", padding: "1rem 0.85rem" }}>
-          <p style={{ color: "rgba(245,241,235,0.38)", fontSize: "0.52rem", letterSpacing: "0.28em", textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif", marginBottom: "0.1rem", flexShrink: 0 }}>Up next</p>
-          {suggestions.map(v => (
-            <motion.div key={v.id} whileHover={{ scale: 1.02 }} onClick={() => setActiveId(v.id)}
-              style={{ cursor: "pointer", borderRadius: "8px", overflow: "hidden", background: "#1C1814", border: "1px solid rgba(245,241,235,0.07)", transition: "border-color 200ms" }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(176,141,91,0.4)"}
-              onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(245,241,235,0.07)"}>
-              <div style={{ position: "relative", aspectRatio: "16/9" }}>
-                <img src={`https://img.youtube.com/vi/${extractYouTubeId(v.id)}/mqdefault.jpg`} alt={v.title}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                <div style={{ position: "absolute", inset: 0, background: "rgba(20,17,14,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ width: "30px", height: "30px", borderRadius: "50%", background: "rgba(176,141,91,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Play size={12} fill="white" color="white" style={{ marginLeft: "2px" }} />
+        {suggestions.length > 0 && (
+          <div
+            className="video-modal-sidebar"
+            style={{ display: "flex", flexDirection: "column", gap: "0.6rem", overflowY: "auto", scrollbarWidth: "none", background: "#0F0D0B", borderRadius: "12px", padding: "1rem 0.9rem" }}
+          >
+            <p style={{ color: "rgba(245,241,235,0.35)", fontSize: "0.5rem", letterSpacing: "0.28em", textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif", marginBottom: "0.25rem", flexShrink: 0 }}>Up next</p>
+            {suggestions.map(v => (
+              <motion.div
+                key={v.id}
+                whileHover={{ scale: 1.02 }}
+                onClick={() => setActiveId(v.id)}
+                style={{ cursor: "pointer", borderRadius: "8px", overflow: "hidden", background: "#1C1814", border: "1px solid rgba(245,241,235,0.07)", transition: "border-color 200ms", flexShrink: 0 }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(176,141,91,0.45)"}
+                onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(245,241,235,0.07)"}
+              >
+                <div style={{ position: "relative", paddingTop: "56.25%" }}>
+                  <img
+                    src={`https://img.youtube.com/vi/${extractYouTubeId(v.id)}/mqdefault.jpg`}
+                    alt={v.title}
+                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                  <div style={{ position: "absolute", inset: 0, background: "rgba(14,11,9,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(176,141,91,0.92)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Play size={11} fill="white" color="white" style={{ marginLeft: "2px" }} />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div style={{ padding: "0.55rem 0.7rem" }}>
-                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "0.78rem", color: "#F5F1EB", lineHeight: 1.35, marginBottom: "0.2rem" }}>{v.title}</p>
-                <p style={{ color: "rgba(245,241,235,0.38)", fontSize: "0.62rem", fontFamily: "'DM Sans', sans-serif" }}>{v.desc}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* ── Close button ── */}
-        <button onClick={onClose} style={{ position: "absolute", top: "-0.6rem", right: "-0.6rem", background: "rgba(44,40,37,0.95)", border: "1px solid rgba(245,241,235,0.12)", color: "white", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 10 }}>
-          <X size={15} />
-        </button>
+                <div style={{ padding: "0.5rem 0.65rem" }}>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "0.75rem", color: "#F5F1EB", lineHeight: 1.35, marginBottom: "0.15rem" }}>{v.title}</p>
+                  <p style={{ color: "rgba(245,241,235,0.38)", fontSize: "0.6rem", fontFamily: "'DM Sans', sans-serif" }}>{v.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

@@ -7,6 +7,7 @@ import ContactPage from "./pages/ContactPage";
 import GalleryPage from "./pages/GalleryPage";
 import ProcessPage from "./pages/ProcessPage";
 import AboutPage from "./pages/AboutPage";
+import ThankYouPage from "./pages/ThankYouPage";
 import { CartProvider } from "./context/CartContext";
 import CartDrawer from "./components/CartDrawer";
 import { ContentProvider } from "./context/ContentContext";
@@ -83,6 +84,7 @@ export default function App() {
         <ScrollToTop />
         <Switch>
           <Route path="/admin" component={AdminPage} />
+          <Route path="/thank-you" component={ThankYouPage} />
           <Route path="/collection/:id" component={CollectionDetailPage} />
           <Route path="/gallery" component={GalleryPage} />
           <Route path="/shop" component={ShopPage} />

@@ -1,0 +1,1506 @@
+<?php
+/* ============================================================
+   PicturePerfectTones — Complete CMS Setup  v8
+   (CMS + Digital Downloads — orders, payments, zip delivery)
+
+   Instructions: Snippets → Add New → paste → Save & Activate
+   (Delete/deactivate any previous PPT snippet first — this also clears
+    stale ACF field registrations, fixing any unexpected text-box URL
+    fields that appear in the homepage admin panel)
+
+   ┌─ BEFORE ACTIVATING — fill in this value ───────────────┐
+   │  PPT_API_SECRET → any random string (keep secret)      │
+   │  (Must match the PPT_API_SECRET set in Replit Secrets) │
+   └────────────────────────────────────────────────────────┘
+
+   ┌─ EMAIL DELIVERABILITY SETUP (do once after activating) ────────────────────┐
+   │  Emails currently send via PHP mail() which most spam filters reject.      │
+   │  Follow these steps to switch to authenticated SMTP and add DNS records.  │
+   │                                                                            │
+   │  STEP 1 — Create a free Brevo account (https://www.brevo.com)             │
+   │     Go to Brevo → Senders & IPs → Domains → Add Domain                   │
+   │     → enter pictureperfecttones.com → click Verify.                       │
+   │     Brevo will generate a DKIM TXT record — copy the Name and Value.      │
+   │                                                                            │
+   │  STEP 2 — Add DNS records in Hostinger (hPanel → Domains → DNS Zone):    │
+   │                                                                            │
+   │     SPF    Type TXT  Name: @                                               │
+   │            Value: v=spf1 include:spf.hostinger.com include:sendinblue.com ~all │
+   │            → Brevo SPF include is sendinblue.com (confirm at               │
+   │              https://help.brevo.com/hc/en-us/articles/209480485)           │
+   │                                                                            │
+   │     DKIM   Type TXT  Name: (from Brevo, e.g. mail._domainkey)             │
+   │            Value: (from Brevo domain verification screen)                  │
+   │                                                                            │
+   │     DMARC  Type TXT  Name: _dmarc                                         │
+   │            Value: v=DMARC1; p=none; rua=mailto:admin@pictureperfecttones.com │
+   │            → p=none = monitor only. Switch to p=quarantine after 1-2 weeks │
+   │              once MXToolbox confirms SPF + DKIM are both passing.          │
+   │                                                                            │
+   │  STEP 3 — Configure SMTP in WordPress:                                     │
+   │     Go to WordPress → Settings → PPT SMTP (added by this snippet).        │
+   │     Enter your Brevo login email, SMTP key (from Brevo → SMTP & API),    │
+   │     and verified From address. Save, then click Send Test Email.          │
+   │                                                                            │
+   │  STEP 4 — Verify:                                                          │
+   │     MXToolbox → https://mxtoolbox.com/SuperTool.aspx                      │
+   │       SPF:   spf:pictureperfecttones.com                                   │
+   │       DKIM:  dkim:mail:pictureperfecttones.com                             │
+   │       DMARC: dmarc:pictureperfecttones.com                                 │
+   │     mail-tester.com → send a test email, aim for ≥ 9/10                   │
+   └────────────────────────────────────────────────────────────────────────────┘
+
+   ALSO SET IN REPLIT → Secrets (server-side, no VITE_ prefix):
+   - WP_URL                  = https://yourdomain.com
+   - PPT_API_SECRET          = same as constant below
+   - RAZORPAY_KEY_ID         = your Razorpay Key ID
+   - RAZORPAY_KEY_SECRET     = your Razorpay Secret Key
+   - RAZORPAY_WEBHOOK_SECRET = from Razorpay Dashboard → Webhooks
+   - ADMIN_EMAIL             = your admin login email
+   - ADMIN_PASSWORD          = your admin login password
+
+   ALSO SET (VITE_ prefix, readable on frontend):
+   - VITE_WP_URL             = https://yourdomain.com
+   - VITE_RAZORPAY_KEY_ID    = your Razorpay Key ID
+   ============================================================ */
+
+
+/* ──────────────────────────────────────────────────────────
+   DIGITAL DOWNLOADS — CONFIGURATION (update before activating)
+   ────────────────────────────────────────────────────────── */
+if ( ! defined('PPT_API_SECRET') ) {
+    define('PPT_API_SECRET', 'change-this-to-a-random-secret');  // ← CHANGE THIS (must match Replit PPT_API_SECRET secret)
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   SMTP — Authenticated email delivery (replaces PHP mail)
+   Credentials are stored in the WordPress database via the
+   Settings → PPT SMTP page below — never in source code.
+
+   SETUP STEPS:
+   1. Create a free Brevo account at https://www.brevo.com
+      (300 free transactional emails/day).
+   2. In Brevo → Senders & IPs → Domains → Add Domain
+      → enter pictureperfecttones.com → Verify.
+      Brevo will show you a DKIM TXT record; add it to
+      Hostinger DNS (hPanel → Domains → DNS Zone).
+   3. In Brevo → SMTP & API → SMTP tab, note your login
+      email and generate/copy your SMTP key.
+   4. Add these DNS records in Hostinger hPanel → DNS Zone:
+
+      SPF   Type TXT  Name: @
+            Value: v=spf1 include:spf.hostinger.com include:sendinblue.com ~all
+
+      DKIM  Type TXT  Name: (given by Brevo, e.g. mail._domainkey)
+            Value: (given by Brevo)
+
+      DMARC Type TXT  Name: _dmarc
+            Value: v=DMARC1; p=none; rua=mailto:admin@pictureperfecttones.com
+
+   5. In WordPress go to Settings → PPT SMTP and enter your
+      Brevo login email, SMTP key, and verified From address.
+      Click Save, then Send Test Email.
+   6. Verify at https://mxtoolbox.com and https://www.mail-tester.com
+      (target ≥ 9/10).
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Admin settings page: Settings → PPT SMTP ── */
+add_action( 'admin_menu', function () {
+    add_options_page(
+        'PPT SMTP Settings',
+        'PPT SMTP',
+        'manage_options',
+        'ppt-smtp',
+        'ppt_smtp_settings_page'
+    );
+} );
+
+add_action( 'admin_init', function () {
+    register_setting( 'ppt_smtp_group', 'ppt_smtp_options', [
+        'sanitize_callback' => function ( $input ) {
+            return [
+                'host'      => sanitize_text_field( $input['host'] ?? 'smtp-relay.brevo.com' ),
+                'port'      => absint( $input['port'] ?? 587 ),
+                'user'      => sanitize_email( $input['user'] ?? '' ),
+                'pass'      => sanitize_text_field( $input['pass'] ?? '' ),
+                'from'      => sanitize_email( $input['from'] ?? '' ),
+                'from_name' => sanitize_text_field( $input['from_name'] ?? 'Picture Perfect Tones' ),
+            ];
+        },
+    ] );
+} );
+
+function ppt_smtp_settings_page() {
+    if ( ! current_user_can( 'manage_options' ) ) { return; }
+
+    /* ── Handle test email ── */
+    $test_msg = '';
+    if ( isset( $_POST['ppt_smtp_test_nonce'] ) &&
+         wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ppt_smtp_test_nonce'] ) ), 'ppt_smtp_test' ) ) {
+        $result = wp_mail(
+            get_option('admin_email'),
+            'PPT SMTP Test — ' . get_bloginfo('name'),
+            "This test email confirms that authenticated SMTP is working correctly for " . get_bloginfo('name') . ".\n\nSent via PPT SMTP settings.",
+            [ 'Content-Type: text/plain; charset=UTF-8' ]
+        );
+        $test_msg = $result
+            ? '<div style="background:#d4edda;border:1px solid #c3e6cb;padding:10px 16px;border-radius:4px;margin:16px 0;">
+                 ✅ Test email sent to ' . esc_html( get_option('admin_email') ) . '. Check your inbox (and spam).</div>'
+            : '<div style="background:#f8d7da;border:1px solid #f5c6cb;padding:10px 16px;border-radius:4px;margin:16px 0;">
+                 ❌ Sending failed. Check your SMTP credentials below and try again.</div>';
+    }
+
+    $opts = wp_parse_args( get_option( 'ppt_smtp_options', [] ), [
+        'host'      => 'smtp-relay.brevo.com',
+        'port'      => 587,
+        'user'      => '',
+        'pass'      => '',
+        'from'      => 'admin@pictureperfecttones.com',
+        'from_name' => 'Picture Perfect Tones',
+    ] );
+    ?>
+    <div class="wrap">
+        <h1>PPT SMTP Settings</h1>
+        <p>Configure authenticated SMTP so order confirmation emails are delivered to the inbox, not spam.<br>
+           Use <a href="https://www.brevo.com" target="_blank">Brevo</a> (free — 300 emails/day).
+           After saving, click <strong>Send Test Email</strong> to verify.</p>
+        <?php echo wp_kses_post( $test_msg ); ?>
+        <form method="post" action="options.php">
+            <?php settings_fields( 'ppt_smtp_group' ); ?>
+            <table class="form-table" role="presentation">
+                <tr><th>SMTP Host</th>
+                    <td><input type="text" name="ppt_smtp_options[host]"
+                               value="<?php echo esc_attr( $opts['host'] ); ?>"
+                               class="regular-text" />
+                        <p class="description">Brevo: <code>smtp-relay.brevo.com</code></p></td></tr>
+                <tr><th>SMTP Port</th>
+                    <td><input type="number" name="ppt_smtp_options[port]"
+                               value="<?php echo esc_attr( $opts['port'] ); ?>"
+                               class="small-text" />
+                        <p class="description">Use <code>587</code> (STARTTLS/TLS)</p></td></tr>
+                <tr><th>SMTP Username</th>
+                    <td><input type="email" name="ppt_smtp_options[user]"
+                               value="<?php echo esc_attr( $opts['user'] ); ?>"
+                               class="regular-text" autocomplete="off" />
+                        <p class="description">Your Brevo login email address</p></td></tr>
+                <tr><th>SMTP Password / Key</th>
+                    <td><input type="password" name="ppt_smtp_options[pass]"
+                               value="<?php echo esc_attr( $opts['pass'] ); ?>"
+                               class="regular-text" autocomplete="new-password" />
+                        <p class="description">Your Brevo SMTP key (from Brevo → SMTP &amp; API → SMTP tab)</p></td></tr>
+                <tr><th>From Email</th>
+                    <td><input type="email" name="ppt_smtp_options[from]"
+                               value="<?php echo esc_attr( $opts['from'] ); ?>"
+                               class="regular-text" />
+                        <p class="description">Must be a verified sender address in Brevo</p></td></tr>
+                <tr><th>From Name</th>
+                    <td><input type="text" name="ppt_smtp_options[from_name]"
+                               value="<?php echo esc_attr( $opts['from_name'] ); ?>"
+                               class="regular-text" /></td></tr>
+            </table>
+            <?php submit_button( 'Save SMTP Settings' ); ?>
+        </form>
+        <hr>
+        <h2>Send a Test Email</h2>
+        <form method="post">
+            <?php wp_nonce_field( 'ppt_smtp_test', 'ppt_smtp_test_nonce' ); ?>
+            <?php submit_button( 'Send Test Email', 'secondary' ); ?>
+        </form>
+    </div>
+    <?php
+}
+
+/* ── PHPMailer hook: applies saved SMTP settings to every wp_mail() call ── */
+add_action( 'phpmailer_init', function ( $phpmailer ) {
+    $opts = get_option( 'ppt_smtp_options', [] );
+    $user = $opts['user'] ?? '';
+    $pass = $opts['pass'] ?? '';
+    $host = $opts['host'] ?? '';
+
+    if ( empty( $user ) || empty( $pass ) || empty( $host ) ) {
+        return; // SMTP not yet configured — fall back to PHP mail()
+    }
+
+    $phpmailer->isSMTP();
+    $phpmailer->Host       = $host;
+    $phpmailer->SMTPAuth   = true;
+    $phpmailer->Port       = intval( $opts['port'] ?? 587 );
+    $phpmailer->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+    $phpmailer->Username   = $user;
+    $phpmailer->Password   = $pass;
+
+    $from      = $opts['from']      ?? '';
+    $from_name = $opts['from_name'] ?? 'Picture Perfect Tones';
+    if ( ! empty( $from ) ) {
+        $phpmailer->setFrom( $from, $from_name );
+    }
+}, 20 ); // priority 20 — after ppt_send_confirmation_email's AltBody hook (priority 10)
+
+
+/* ──────────────────────────────────────────────────────────
+   1. CORS — allow all origins (works for localhost dev + live)
+   ────────────────────────────────────────────────────────── */
+
+// Handle pre-flight OPTIONS requests early (before WP loads fully)
+add_action('init', function () {
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, X-PPT-Secret, Authorization');
+        status_header(200);
+        exit();
+    }
+}, 11);
+
+// Hook into WP REST API directly so our CORS headers are never overridden
+add_action('rest_api_init', function () {
+    remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
+    add_filter('rest_pre_serve_request', function ($value) {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, X-PPT-Secret, Authorization');
+        return $value;
+    });
+}, 15);
+
+// Allow unauthenticated GET access to published presets via /wp-json/wp/v2/presets
+// (needed for local dev and any origin — the post type is private but data is not sensitive)
+add_filter('rest_endpoints', function ($endpoints) {
+    $public_get = ['GET' => true];
+    foreach (['/wp/v2/presets', '/wp/v2/presets/(?P<id>[\d]+)'] as $route) {
+        if (isset($endpoints[$route])) {
+            foreach ($endpoints[$route] as &$ep) {
+                if (!empty($ep['methods']) && array_intersect_key($public_get, (array) $ep['methods'])) {
+                    $ep['permission_callback'] = '__return_true';
+                }
+            }
+            unset($ep);
+        }
+    }
+    return $endpoints;
+});
+
+
+/* ──────────────────────────────────────────────────────────
+   2. CUSTOM POST TYPES
+   ────────────────────────────────────────────────────────── */
+add_action('init', function () {
+
+    register_post_type('ppt_homepage', [
+        'label'         => 'Home Page',
+        'public'        => false,
+        'show_ui'       => true,
+        'show_in_menu'  => true,
+        'show_in_rest'  => true,
+        'supports'      => ['title'],
+        'menu_icon'     => 'dashicons-admin-home',
+        'menu_position' => 3,
+        'capabilities'  => ['create_posts' => 'do_not_allow'],
+        'map_meta_cap'  => true,
+    ]);
+
+    register_post_type('preset', [
+        'label'         => 'Presets',
+        'public'        => false,
+        'show_ui'       => true,
+        'show_in_menu'  => true,
+        'show_in_rest'  => true,
+        'rest_base'     => 'presets',
+        'supports'      => ['title'],
+        'menu_icon'     => 'dashicons-camera',
+        'menu_position' => 4,
+    ]);
+
+});
+
+
+/* ──────────────────────────────────────────────────────────
+   3. AUTO-CREATE HOME PAGE POST (runs once)
+   ────────────────────────────────────────────────────────── */
+add_action('init', function () {
+    if (get_option('ppt_homepage_created')) return;
+    $existing = get_posts(['post_type' => 'ppt_homepage', 'numberposts' => 1]);
+    if (empty($existing)) {
+        wp_insert_post(['post_title' => 'Home Page Settings', 'post_type' => 'ppt_homepage', 'post_status' => 'publish']);
+        update_option('ppt_homepage_created', true);
+    }
+});
+
+add_action('before_delete_post', function ($id) {
+    if (get_post_type($id) === 'ppt_homepage')
+        wp_die('The Home Page Settings cannot be deleted — please edit it instead.', 'Not Allowed', ['back_link' => true]);
+});
+
+add_action('current_screen', function () {
+    $s = get_current_screen();
+    if ($s && $s->post_type === 'ppt_homepage' && $s->base === 'edit') {
+        $posts = get_posts(['post_type' => 'ppt_homepage', 'numberposts' => 1]);
+        if (!empty($posts)) { wp_redirect(admin_url('post.php?post=' . $posts[0]->ID . '&action=edit')); exit; }
+    }
+});
+
+add_action('admin_menu', function () {
+    remove_submenu_page('edit.php?post_type=ppt_homepage', 'post-new.php?post_type=ppt_homepage');
+});
+
+add_filter('post_row_actions', function ($actions, $post) {
+    if ($post->post_type === 'ppt_homepage') { unset($actions['trash'], $actions['view']); }
+    return $actions;
+}, 10, 2);
+
+/* Remove stray metaboxes from the homepage edit screen.
+   If an "Image URL" text box still appears, go to WordPress → ACF → Field Groups,
+   find any group targeting the ppt_homepage post type, and delete it. */
+add_action('add_meta_boxes', function () {
+    remove_meta_box('postimagediv', 'ppt_homepage', 'side');
+    remove_meta_box('postcustom',   'ppt_homepage', 'normal');
+    remove_meta_box('wpseo_meta',   'ppt_homepage', 'normal');
+    remove_meta_box('wpseo_meta',   'ppt_homepage', 'side');
+}, 99);
+
+
+/* ──────────────────────────────────────────────────────────
+   4. ACF FIELD GROUPS
+   ────────────────────────────────────────────────────────── */
+add_action('acf/init', function () {
+
+    /* ══════════════════════════════════════════════════════
+       HOME PAGE — Section 1: Before / After  (6 fixed pairs)
+    ══════════════════════════════════════════════════════ */
+    $ba_fields = [];
+    $ba_fields[] = ['key' => 'field_ba_intro', 'label' => '', 'name' => '', 'type' => 'message',
+        'message' => '<p style="color:#888;margin:0">Replace the before and after images for each comparison pair.</p>'];
+    for ($i = 1; $i <= 6; $i++) {
+        $ba_fields[] = ['key' => "field_ba_{$i}_hdr", 'label' => '', 'name' => '', 'type' => 'message', 'message' => "<strong>Pair {$i}</strong>"];
+        $ba_fields[] = ['key' => "field_ba_{$i}_before", 'label' => 'Before Image ★', 'name' => "ba_{$i}_before",
+            'type' => 'image', 'return_format' => 'url', 'required' => 1, 'preview_size' => 'medium',
+            'instructions' => 'Upload the unedited / raw photo', 'wrapper' => ['width' => '50']];
+        $ba_fields[] = ['key' => "field_ba_{$i}_after", 'label' => 'After Image ★', 'name' => "ba_{$i}_after",
+            'type' => 'image', 'return_format' => 'url', 'required' => 1, 'preview_size' => 'medium',
+            'instructions' => 'Upload the same photo with the preset applied', 'wrapper' => ['width' => '50']];
+    }
+    acf_add_local_field_group([
+        'key' => 'group_hp_ba', 'title' => '📸 Transformation — Before / After  (6 fixed pairs)',
+        'fields' => $ba_fields,
+        'location' => [[['param' => 'post_type', 'operator' => '==', 'value' => 'ppt_homepage']]],
+        'menu_order' => 1,
+    ]);
+
+
+    /* ══════════════════════════════════════════════════════
+       HOME PAGE — Section 2: Signature Collections
+    ══════════════════════════════════════════════════════ */
+    $col_fields = [];
+    $col_fields[] = ['key' => 'field_col_intro', 'label' => '', 'name' => '', 'type' => 'message',
+        'message' => '<p style="color:#888;margin:0">Edit text, price, mood tags, and images for each collection.</p>'];
+
+    $col_titles = ['The Ivory Edit', 'The Crimson Edit', 'The Heritage Edit'];
+    $col_moods  = ['Soft, Ethereal, Luminous', 'Dramatic, Regal, Bold', 'Cinematic, Warm, Timeless'];
+    $col_prices = ['₹3,999', '₹4,499', '₹5,499'];
+    $col_tags   = ['For stories told in whispers and light.', 'Where every frame commands the room.', 'Palaces, mandaps, and golden light.'];
+    $col_descs  = [
+        'Film-like luminosity for photographers who live for soft candlelight and intimate moments.',
+        'Built for the richness of traditional Indian ceremonies. Deep reds stay true, gold embroidery gleams.',
+        'Inspired by heritage venues and the warmth of candlelit mandaps. A cinematic grade that brings depth.',
+    ];
+    $inc_defaults = [
+        ['12 Lightroom Presets', 'Lightroom Mobile Compatible', 'One-Click Apply', 'Free Lifetime Updates'],
+        ['14 Lightroom Presets', 'Camera Raw Profiles', 'Lightroom Mobile Compatible', 'Wedding Day Workflow Guide'],
+        ['16 Lightroom Presets', 'Video LUTs Included', 'Mobile + Desktop Profiles', 'Private Editing Masterclass'],
+    ];
+
+    for ($c = 1; $c <= 3; $c++) {
+        $col_fields[] = ['key' => "field_col_{$c}_hdr", 'label' => '', 'name' => '', 'type' => 'message',
+            'message' => "<h3 style='color:#B08D5B;margin:16px 0 2px'>{$col_titles[$c-1]}</h3>"];
+        $col_fields[] = ['key' => "field_col_{$c}_name", 'label' => 'Collection Name ★', 'name' => "col_{$c}_name",
+            'type' => 'text', 'required' => 1, 'maxlength' => 30, 'default_value' => $col_titles[$c-1],
+            'placeholder' => $col_titles[$c-1], 'instructions' => 'Max 30 characters', 'wrapper' => ['width' => '50']];
+        $col_fields[] = ['key' => "field_col_{$c}_price", 'label' => 'Price ★  (must include ₹ symbol)', 'name' => "col_{$c}_price",
+            'type' => 'text', 'required' => 1, 'maxlength' => 10, 'default_value' => $col_prices[$c-1],
+            'placeholder' => $col_prices[$c-1], 'instructions' => 'Example: ₹3,999', 'wrapper' => ['width' => '50']];
+        $col_fields[] = ['key' => "field_col_{$c}_tagline", 'label' => 'Tagline ★', 'name' => "col_{$c}_tagline",
+            'type' => 'text', 'required' => 1, 'maxlength' => 60, 'default_value' => $col_tags[$c-1],
+            'placeholder' => $col_tags[$c-1], 'instructions' => 'Max 60 characters'];
+        $col_fields[] = ['key' => "field_col_{$c}_description", 'label' => 'Description ★', 'name' => "col_{$c}_description",
+            'type' => 'textarea', 'required' => 1, 'maxlength' => 250, 'rows' => 4,
+            'default_value' => $col_descs[$c-1], 'placeholder' => $col_descs[$c-1], 'instructions' => 'Max 250 characters'];
+        $col_fields[] = ['key' => "field_col_{$c}_mood", 'label' => 'Mood Tags ★', 'name' => "col_{$c}_mood",
+            'type' => 'text', 'required' => 1, 'maxlength' => 50, 'default_value' => $col_moods[$c-1],
+            'placeholder' => $col_moods[$c-1], 'instructions' => 'Comma-separated — e.g. Soft, Warm, Luminous', 'wrapper' => ['width' => '60']];
+        $col_fields[] = ['key' => "field_col_{$c}_accent", 'label' => 'Background Accent Colour', 'name' => "col_{$c}_accent",
+            'type' => 'color_picker', 'wrapper' => ['width' => '20']];
+        $col_fields[] = ['key' => "field_col_{$c}_flip", 'label' => 'Flip Layout', 'name' => "col_{$c}_flip",
+            'type' => 'true_false', 'ui' => 1, 'instructions' => 'Toggle ON to flip image/text sides', 'wrapper' => ['width' => '20']];
+        $col_fields[] = ['key' => "field_col_{$c}_inc_hdr", 'label' => '', 'name' => '', 'type' => 'message',
+            'message' => '<strong>What\'s Included ★</strong> — all 4 items required (max 40 chars each)'];
+        for ($ii = 1; $ii <= 4; $ii++) {
+            $col_fields[] = ['key' => "field_col_{$c}_inc_{$ii}", 'label' => "Item {$ii} ★", 'name' => "col_{$c}_inc_{$ii}",
+                'type' => 'text', 'required' => 1, 'maxlength' => 40,
+                'default_value' => $inc_defaults[$c-1][$ii-1], 'placeholder' => $inc_defaults[$c-1][$ii-1], 'wrapper' => ['width' => '50']];
+        }
+        $col_fields[] = ['key' => "field_col_{$c}_img_hdr", 'label' => '', 'name' => '', 'type' => 'message',
+            'message' => '<p style="color:#B08D5B;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;margin:8px 0 4px">Images</p>'];
+        $col_fields[] = ['key' => "field_col_{$c}_hero", 'label' => 'Hero Image ★', 'name' => "col_{$c}_hero",
+            'type' => 'image', 'return_format' => 'url', 'required' => 1, 'preview_size' => 'medium',
+            'instructions' => 'Main large image', 'wrapper' => ['width' => '34']];
+        $col_fields[] = ['key' => "field_col_{$c}_mid", 'label' => 'Middle Image ★', 'name' => "col_{$c}_mid",
+            'type' => 'image', 'return_format' => 'url', 'required' => 1, 'preview_size' => 'medium', 'wrapper' => ['width' => '33']];
+        $col_fields[] = ['key' => "field_col_{$c}_sm", 'label' => 'Small Image ★', 'name' => "col_{$c}_sm",
+            'type' => 'image', 'return_format' => 'url', 'required' => 1, 'preview_size' => 'medium', 'wrapper' => ['width' => '33']];
+    }
+    acf_add_local_field_group([
+        'key' => 'group_hp_cols', 'title' => '✨ Signature Collections  (3 collections — all fields mandatory)',
+        'fields' => $col_fields,
+        'location' => [[['param' => 'post_type', 'operator' => '==', 'value' => 'ppt_homepage']]],
+        'menu_order' => 2,
+    ]);
+
+
+    /* ══════════════════════════════════════════════════════
+       PRESETS — Preset Info + Collection Detail Page
+    ══════════════════════════════════════════════════════ */
+    $pair_fields = [];
+    $pair_fields[] = ['key' => 'field_pr_col_pairs_hdr', 'label' => '', 'name' => '', 'type' => 'message',
+        'message' => '<p style="color:#B08D5B;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;margin:12px 0 2px">Before / After Pairs</p>
+                      <p style="color:#888;font-size:12px;margin:0 0 6px">Up to 10 pairs. Leave a pair blank to skip it.</p>'];
+    for ($p = 1; $p <= 10; $p++) {
+        $pair_fields[] = ['key' => "field_pr_pair_{$p}_hdr", 'label' => '', 'name' => '', 'type' => 'message',
+            'message' => "<strong style='color:#555'>Pair {$p}</strong>"];
+        $pair_fields[] = ['key' => "field_pr_pair_{$p}_before", 'label' => "Before — Pair {$p}", 'name' => "col_pair_{$p}_before",
+            'type' => 'image', 'return_format' => 'url', 'preview_size' => 'medium', 'wrapper' => ['width' => '50']];
+        $pair_fields[] = ['key' => "field_pr_pair_{$p}_after", 'label' => "After — Pair {$p}", 'name' => "col_pair_{$p}_after",
+            'type' => 'image', 'return_format' => 'url', 'preview_size' => 'medium', 'wrapper' => ['width' => '50']];
+    }
+
+    acf_add_local_field_group([
+        'key' => 'group_presets', 'title' => 'Preset Details',
+        'location' => [[['param' => 'post_type', 'operator' => '==', 'value' => 'preset']]],
+        'fields' => array_merge([
+            ['key' => 'field_pr_hdr_info', 'label' => '', 'name' => '', 'type' => 'message',
+             'message' => '<h3 style="color:#B08D5B;margin:8px 0 4px">🛍️ Preset Info</h3>'],
+            ['key' => 'field_pr_active', 'label' => 'Visibility', 'name' => 'active',
+             'type' => 'true_false', 'ui' => 1, 'default_value' => 1,
+             'ui_on_text' => '✅ Visible in Shop', 'ui_off_text' => '🚫 Hidden from Shop'],
+            ['key' => 'field_pr_name', 'label' => 'Name ★', 'name' => 'pr_name',
+             'type' => 'text', 'required' => 1, 'maxlength' => 40, 'placeholder' => 'The Ivory Edit', 'wrapper' => ['width' => '50']],
+            ['key' => 'field_pr_price', 'label' => 'Price ★  (must include ₹)', 'name' => 'price',
+             'type' => 'text', 'required' => 1, 'maxlength' => 10, 'placeholder' => '₹3,999', 'wrapper' => ['width' => '50']],
+            ['key' => 'field_pr_tagline', 'label' => 'Tagline ★  (max 50 chars)', 'name' => 'tagline',
+             'type' => 'text', 'required' => 1, 'maxlength' => 50, 'placeholder' => 'Soft, ethereal luminosity'],
+            ['key' => 'field_pr_badge', 'label' => 'Badge  (optional)', 'name' => 'badge',
+             'type' => 'select', 'allow_null' => 1,
+             'choices' => ['' => '— None —', 'Bestseller' => 'Bestseller', 'New' => 'New', 'Sale' => 'Sale', 'Popular' => 'Popular'],
+             'wrapper' => ['width' => '50']],
+            ['key' => 'field_pr_count', 'label' => 'Preset Count ★', 'name' => 'count',
+             'type' => 'number', 'required' => 1, 'min' => 1, 'max' => 999, 'placeholder' => '12', 'wrapper' => ['width' => '50']],
+            ['key' => 'field_pr_cats', 'label' => 'Filter Categories', 'name' => 'categories',
+             'type' => 'checkbox', 'layout' => 'horizontal',
+             'choices' => ['wedding' => '💍 Wedding', 'cinematic' => '🎬 Cinematic',
+                           'warm' => '🌅 Warm', 'moody' => '🌙 Moody', 'portrait' => '👤 Portrait']],
+            ['key' => 'field_pr_img', 'label' => 'Card Image ★  (shown in the shop grid)', 'name' => 'img',
+             'type' => 'image', 'return_format' => 'url', 'required' => 1, 'preview_size' => 'medium'],
+            ['key' => 'field_pr_col_hdr', 'label' => '', 'name' => '', 'type' => 'message',
+             'message' => '<h3 style="color:#B08D5B;margin:24px 0 4px">📄 Collection Detail Page</h3>'],
+            ['key' => 'field_pr_col_name', 'label' => 'Collection Name ★', 'name' => 'col_name',
+             'type' => 'text', 'required' => 1, 'maxlength' => 40, 'placeholder' => 'The Ivory Edit', 'wrapper' => ['width' => '50']],
+            ['key' => 'field_pr_col_price_display', 'label' => 'Price  (leave blank to use Preset Info price)', 'name' => 'col_price',
+             'type' => 'text', 'maxlength' => 10, 'placeholder' => '₹3,999', 'wrapper' => ['width' => '50']],
+            ['key' => 'field_pr_col_tagline', 'label' => 'Tagline ★  (max 80 chars)', 'name' => 'col_tagline',
+             'type' => 'text', 'required' => 1, 'maxlength' => 80, 'placeholder' => 'Soft, ethereal luminosity for intimate moments'],
+            ['key' => 'field_pr_col_desc', 'label' => 'Description ★  (max 400 chars)', 'name' => 'col_description',
+             'type' => 'textarea', 'required' => 1, 'maxlength' => 400, 'rows' => 4],
+            ['key' => 'field_pr_col_hero', 'label' => 'Hero Image ★', 'name' => 'col_hero',
+             'type' => 'image', 'return_format' => 'url', 'required' => 1, 'preview_size' => 'medium'],
+            ['key' => 'field_pr_spec_hdr', 'label' => '', 'name' => '', 'type' => 'message',
+             'message' => '<p style="color:#B08D5B;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;margin:12px 0 4px">Spec Labels</p>'],
+            ['key' => 'field_pr_col_count', 'label' => 'Presets Count ★', 'name' => 'col_count',
+             'type' => 'number', 'required' => 1, 'min' => 1, 'max' => 999, 'placeholder' => '12', 'wrapper' => ['width' => '34']],
+            ['key' => 'field_pr_col_format', 'label' => 'Format ★', 'name' => 'col_format',
+             'type' => 'text', 'required' => 1, 'maxlength' => 30, 'default_value' => 'XMP', 'wrapper' => ['width' => '33']],
+            ['key' => 'field_pr_col_compat', 'label' => 'Works With ★', 'name' => 'col_compat',
+             'type' => 'text', 'required' => 1, 'maxlength' => 60,
+             'default_value' => 'Lightroom Mobile & Desktop', 'wrapper' => ['width' => '33']],
+            ['key' => 'field_pr_col_style', 'label' => 'Style Label  (optional, max 40 chars)', 'name' => 'col_style',
+             'type' => 'text', 'maxlength' => 40, 'placeholder' => 'Soft · Warm · Luminous'],
+        ], $pair_fields),
+    ]);
+
+
+    /* ══════════════════════════════════════════════════════
+       PRESET DOWNLOAD FILES — Zip upload field
+    ══════════════════════════════════════════════════════ */
+    acf_add_local_field_group([
+        'key'      => 'group_ppt_preset_files',
+        'title'    => '📦 Preset Download Files',
+        'fields'   => [
+            [
+                'key'          => 'field_ppt_preset_id_slug',
+                'label'        => 'Preset Cart ID ★',
+                'name'         => 'preset_id_slug',
+                'type'         => 'text',
+                'instructions' => 'Enter the cart ID that matches this preset in the shop (e.g. ivory, crimson, heritage, celebration, golden, portrait). Must be lowercase, no spaces.',
+                'required'     => 1,
+                'placeholder'  => 'ivory',
+                'wrapper'      => ['width' => '50'],
+            ],
+            [
+                'key'           => 'field_ppt_preset_zip',
+                'label'         => 'Preset Zip File ★  (required — customers cannot purchase without this)',
+                'name'          => 'preset_zip_file',
+                'type'          => 'file',
+                'instructions'  => 'Upload the ZIP file customers will download after purchase. The preset cannot be published without this file.',
+                'required'      => 1,
+                'return_format' => 'url',
+                'library'       => 'all',
+                'mime_types'    => 'zip,application/zip',
+                'wrapper'       => ['width' => '50'],
+            ],
+        ],
+        'location'   => [[['param' => 'post_type', 'operator' => '==', 'value' => 'preset']]],
+        'menu_order' => 5,
+        'position'   => 'normal',
+        'active'     => true,
+    ]);
+});
+
+/* ──────────────────────────────────────────────────────────
+   ACF SYNC: Auto-register preset zip in ppt_preset_files
+   when a preset post is saved with both fields filled.
+   ────────────────────────────────────────────────────────── */
+add_action('acf/save_post', function ($post_id) {
+    if (get_post_type($post_id) !== 'preset') return;
+
+    $zip_url  = get_field('preset_zip_file',  $post_id);
+    $id_slug  = trim((string) get_field('preset_id_slug', $post_id));
+
+    if (!$zip_url || !$id_slug) return;
+
+    global $wpdb;
+    $filename = basename(parse_url($zip_url, PHP_URL_PATH));
+    $table    = $wpdb->prefix . 'ppt_preset_files';
+
+    $existing = $wpdb->get_var($wpdb->prepare(
+        "SELECT id FROM {$table} WHERE preset_id = %s", $id_slug
+    ));
+
+    if ($existing) {
+        $wpdb->update($table,
+            ['filename' => $filename, 'file_url' => $zip_url, 'file_path' => ''],
+            ['preset_id' => $id_slug],
+            ['%s', '%s', '%s'], ['%s']
+        );
+    } else {
+        $wpdb->insert($table,
+            ['preset_id' => $id_slug, 'filename' => $filename, 'file_url' => $zip_url, 'file_path' => ''],
+            ['%s', '%s', '%s', '%s']
+        );
+    }
+}, 20);
+
+/* ──────────────────────────────────────────────────────────
+   ACF VALIDATION: Preset ZIP file is mandatory on save
+   ────────────────────────────────────────────────────────── */
+add_action('acf/validate_save_post', function () {
+    if (get_post_type() !== 'preset') return;
+
+    $zip  = $_POST['acf']['field_ppt_preset_zip']  ?? '';
+    $slug = trim($_POST['acf']['field_ppt_preset_id_slug'] ?? '');
+
+    if (empty($zip)) {
+        acf_add_validation_error(
+            'acf[field_ppt_preset_zip]',
+            'A ZIP file is required before this preset can be saved. Customers cannot purchase without it.'
+        );
+    }
+    if (empty($slug)) {
+        acf_add_validation_error(
+            'acf[field_ppt_preset_id_slug]',
+            'Preset Cart ID is required (e.g. ivory, crimson, heritage). This links the preset to the shop.'
+        );
+    }
+}, 10);
+
+
+
+
+
+/* ──────────────────────────────────────────────────────────
+   6. REST API — expose ACF data on all CPTs
+   ────────────────────────────────────────────────────────── */
+function ppt_img_url($val) {
+    if (!$val) return '';
+    if (is_string($val)) return $val;
+    if (is_array($val) && isset($val['url'])) return $val['url'];
+    if (is_numeric($val)) return wp_get_attachment_url($val) ?: '';
+    return '';
+}
+
+add_action('rest_api_init', function () {
+    register_rest_field('preset', 'acf', [
+        'get_callback' => function ($post) {
+            if (!function_exists('get_fields')) return new stdClass();
+            $f = get_fields($post['id']) ?: [];
+            $f['col_hero'] = ppt_img_url($f['col_hero'] ?? '');
+            $f['img']      = ppt_img_url($f['img']      ?? '');
+            $pairs = [];
+            for ($p = 1; $p <= 10; $p++) {
+                $b = ppt_img_url($f["col_pair_{$p}_before"] ?? '');
+                $a = ppt_img_url($f["col_pair_{$p}_after"]  ?? '');
+                if ($b || $a) $pairs[] = ['before' => $b, 'after' => $a];
+            }
+            $f['col_pairs'] = $pairs;
+            if (!empty($f['pr_name'])) $f['name'] = $f['pr_name'];
+            return $f;
+        },
+        'schema' => null,
+    ]);
+});
+
+add_action('rest_api_init', function () {
+    register_rest_route('ppt/v1', '/homepage', [
+        'methods'             => 'GET',
+        'callback'            => 'ppt_homepage_data',
+        'permission_callback' => '__return_true',
+    ]);
+});
+
+function ppt_homepage_data() {
+    if (!function_exists('get_fields')) {
+        return new WP_Error('acf_missing', 'ACF missing', ['status' => 500]);
+    }
+    nocache_headers();
+    $posts = get_posts(['post_type' => 'ppt_homepage', 'numberposts' => 1, 'post_status' => 'publish']);
+    if (empty($posts)) {
+        $response = new WP_REST_Response(['baPairs' => [], 'collections' => []]);
+        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        $response->header('Pragma', 'no-cache');
+        $response->header('Expires', '0');
+        return $response;
+    }
+    $id = $posts[0]->ID;
+
+    $baPairs = [];
+    for ($i = 1; $i <= 6; $i++) {
+        $before = ppt_img_url(get_field("ba_{$i}_before", $id));
+        $after  = ppt_img_url(get_field("ba_{$i}_after", $id));
+        if ($before && $after) $baPairs[] = ['before' => $before, 'after' => $after, 'alt' => "Before and after pair {$i}"];
+    }
+
+    $collections = [];
+    $nums = ['01', '02', '03'];
+    for ($c = 1; $c <= 3; $c++) {
+        $name = trim((string) get_field("col_{$c}_name", $id));
+        if ($name === '') continue;
+        $included = [];
+        for ($ii = 1; $ii <= 4; $ii++) {
+            $item = trim((string) get_field("col_{$c}_inc_{$ii}", $id));
+            if ($item !== '') $included[] = $item;
+        }
+        $collections[] = [
+            'id'          => $c,
+            'number'      => $nums[$c - 1],
+            'name'        => $name,
+            'price'       => (string) get_field("col_{$c}_price", $id),
+            'tagline'     => (string) get_field("col_{$c}_tagline", $id),
+            'description' => (string) get_field("col_{$c}_description", $id),
+            'mood'        => (string) get_field("col_{$c}_mood", $id),
+            'accent'      => (string) get_field("col_{$c}_accent", $id),
+            'flip'        => (bool)   get_field("col_{$c}_flip", $id),
+            'included'    => $included,
+            'images'      => [
+                'hero'   => ppt_img_url(get_field("col_{$c}_hero", $id)),
+                'middle' => ppt_img_url(get_field("col_{$c}_mid", $id)),
+                'small'  => ppt_img_url(get_field("col_{$c}_sm", $id)),
+            ],
+        ];
+    }
+
+    $response = new WP_REST_Response(['baPairs' => $baPairs, 'collections' => $collections]);
+    $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    $response->header('Pragma', 'no-cache');
+    $response->header('Expires', '0');
+    return $response;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   7. DATABASE TABLES (digital downloads)
+   ────────────────────────────────────────────────────────── */
+add_action('init', function () {
+    if ( get_option('ppt_downloads_db_v2') ) return;
+    global $wpdb;
+    $cc = $wpdb->get_charset_collate();
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+    dbDelta("CREATE TABLE IF NOT EXISTS {$wpdb->prefix}ppt_orders (
+        id             bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        token          varchar(64)         NOT NULL,
+        customer_name  varchar(255)        NOT NULL DEFAULT '',
+        customer_email varchar(255)        NOT NULL DEFAULT '',
+        customer_phone varchar(20)         NOT NULL DEFAULT '',
+        items          longtext            NOT NULL DEFAULT '',
+        total          decimal(10,2)       NOT NULL DEFAULT 0,
+        payment_id     varchar(100)        NOT NULL DEFAULT '',
+        created_at     datetime            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY token (token),
+        UNIQUE KEY payment_id (payment_id)
+    ) $cc;");
+
+    dbDelta("CREATE TABLE IF NOT EXISTS {$wpdb->prefix}ppt_preset_files (
+        id          bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        preset_id   varchar(100)        NOT NULL,
+        filename    varchar(255)        NOT NULL DEFAULT '',
+        file_url    varchar(500)        NOT NULL DEFAULT '',
+        file_path   varchar(500)        NOT NULL DEFAULT '',
+        uploaded_at datetime            NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY preset_id (preset_id)
+    ) $cc;");
+
+    dbDelta("CREATE TABLE IF NOT EXISTS {$wpdb->prefix}ppt_download_tokens (
+        id             bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        order_id       bigint(20) UNSIGNED NOT NULL,
+        order_token    varchar(64)         NOT NULL,
+        preset_id      varchar(100)        NOT NULL,
+        download_count int(11) UNSIGNED    NOT NULL DEFAULT 0,
+        last_downloaded datetime           DEFAULT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY order_token_preset (order_token, preset_id),
+        KEY order_id (order_id)
+    ) $cc;");
+
+    update_option('ppt_downloads_db_v2', true);
+    delete_option('ppt_downloads_db_v1');
+}, 20);
+
+
+/* ──────────────────────────────────────────────────────────
+   8. AUTH HELPERS
+   ────────────────────────────────────────────────────────── */
+function ppt_verify_secret( WP_REST_Request $request ) {
+    $secret = defined('PPT_API_SECRET') ? PPT_API_SECRET : '';
+    if ( empty($secret) || $secret === 'change-this-to-a-random-secret' )
+        return new WP_Error('no_secret', 'API secret not configured on server', ['status' => 500]);
+    $sent = $request->get_header('x_ppt_secret');
+    if ( ! hash_equals($secret, (string) $sent) )
+        return new WP_Error('unauthorized', 'Invalid API secret', ['status' => 401]);
+    return true;
+}
+
+function ppt_auth_required( WP_REST_Request $request ) {
+    return ! is_wp_error( ppt_verify_secret($request) );
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   9. REST ENDPOINTS (digital downloads)
+   ────────────────────────────────────────────────────────── */
+add_action('rest_api_init', function () {
+
+    register_rest_route('ppt/v1', '/save-order', [
+        'methods'             => 'POST',
+        'callback'            => 'ppt_save_order',
+        'permission_callback' => 'ppt_auth_required',
+    ]);
+
+    register_rest_route('ppt/v1', '/download/(?P<token>[a-zA-Z0-9]+)', [
+        'methods'             => 'GET',
+        'callback'            => 'ppt_handle_download',
+        'permission_callback' => '__return_true',
+    ]);
+
+    register_rest_route('ppt/v1', '/upload-zip', [
+        'methods'             => 'POST',
+        'callback'            => 'ppt_upload_zip',
+        'permission_callback' => 'ppt_auth_required',
+    ]);
+
+    register_rest_route('ppt/v1', '/orders', [
+        'methods'             => 'GET',
+        'callback'            => 'ppt_get_orders',
+        'permission_callback' => 'ppt_auth_required',
+    ]);
+
+    register_rest_route('ppt/v1', '/preset-file/(?P<preset_id>[a-zA-Z0-9_%-]+)', [
+        'methods'             => 'GET',
+        'callback'            => 'ppt_get_preset_file',
+        'permission_callback' => 'ppt_auth_required',
+    ]);
+
+    register_rest_route('ppt/v1', '/available-presets', [
+        'methods'             => 'GET',
+        'callback'            => 'ppt_get_available_presets',
+        'permission_callback' => '__return_true',
+    ]);
+});
+
+
+/* ──────────────────────────────────────────────────────────
+   CALLBACK: Save Order
+   ────────────────────────────────────────────────────────── */
+function ppt_save_order( WP_REST_Request $request ) {
+    global $wpdb;
+
+    $data = $request->get_json_params();
+    if ( empty($data) )
+        return new WP_Error('bad_request', 'Invalid or empty JSON body', ['status' => 400]);
+
+    $payment_id     = sanitize_text_field($data['payment_id']     ?? '');
+    $customer_name  = sanitize_text_field($data['customer_name']  ?? '');
+    $customer_email = sanitize_email($data['customer_email']      ?? '');
+    $customer_phone = sanitize_text_field($data['customer_phone'] ?? '');
+    $items          = is_array($data['items']) ? $data['items'] : [];
+    $total          = floatval($data['total']                     ?? 0);
+
+    if ( ! $payment_id || ! is_email($customer_email) )
+        return new WP_Error('missing_fields', 'payment_id and customer_email required', ['status' => 400]);
+
+    // Idempotency — return existing token on duplicate payment_id
+    $existing = $wpdb->get_row($wpdb->prepare(
+        "SELECT id, token FROM {$wpdb->prefix}ppt_orders WHERE payment_id = %s", $payment_id
+    ));
+    if ( $existing )
+        return rest_ensure_response(['success' => true, 'token' => $existing->token, 'duplicate' => true]);
+
+    // Guard: ensure every purchased item has a ZIP file (table OR ACF fallback)
+    $missing_zips = [];
+    foreach ( $items as $item ) {
+        $pid = sanitize_text_field($item['id'] ?? '');
+        if ( ! $pid ) continue;
+
+        // Primary: ppt_preset_files table
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT file_url FROM {$wpdb->prefix}ppt_preset_files WHERE preset_id = %s", $pid
+        ));
+        $has_zip = ( $row && ! empty($row->file_url) );
+
+        // Fallback: ACF preset_zip_file on preset CPT post matching preset_id_slug
+        if ( ! $has_zip && function_exists('get_posts') ) {
+            $posts = get_posts([
+                'post_type'      => 'preset',
+                'posts_per_page' => 1,
+                'meta_query'     => [[
+                    'key'     => 'preset_id_slug',
+                    'value'   => $pid,
+                    'compare' => '=',
+                ]],
+            ]);
+            if ( $posts ) {
+                $zip_url = get_field('preset_zip_file', $posts[0]->ID);
+                $has_zip = ! empty($zip_url);
+            }
+        }
+
+        if ( ! $has_zip ) {
+            $missing_zips[] = $pid;
+        }
+    }
+    if ( ! empty($missing_zips) ) {
+        return new WP_Error('zip_unavailable',
+            'ZIP files not yet uploaded for: ' . implode(', ', $missing_zips),
+            ['status' => 400]
+        );
+    }
+
+    // Payment is already verified by the Node.js server (Razorpay API + amount check)
+    // before this endpoint is called. The X-PPT-Secret header ensures only the
+    // trusted Node server can reach this endpoint, so no re-verification is needed here.
+
+    $token = bin2hex(random_bytes(24));
+
+    $inserted = $wpdb->insert(
+        $wpdb->prefix . 'ppt_orders',
+        ['token' => $token, 'customer_name' => $customer_name, 'customer_email' => $customer_email,
+         'customer_phone' => $customer_phone, 'items' => wp_json_encode($items), 'total' => $total, 'payment_id' => $payment_id],
+        ['%s','%s','%s','%s','%s','%f','%s']
+    );
+
+    if ( ! $inserted ) {
+        $race = $wpdb->get_row($wpdb->prepare("SELECT token FROM {$wpdb->prefix}ppt_orders WHERE payment_id = %s", $payment_id));
+        if ( $race ) return rest_ensure_response(['success' => true, 'token' => $race->token, 'duplicate' => true]);
+        return new WP_Error('db_error', 'Failed to save order: ' . $wpdb->last_error, ['status' => 500]);
+    }
+
+    $order_id = $wpdb->insert_id;
+
+    foreach ( $items as $item ) {
+        $pid = sanitize_text_field($item['id'] ?? '');
+        if ( ! $pid ) continue;
+        $wpdb->insert(
+            $wpdb->prefix . 'ppt_download_tokens',
+            ['order_id' => $order_id, 'order_token' => $token, 'preset_id' => $pid],
+            ['%d','%s','%s']
+        );
+    }
+
+    $download_links = ppt_build_download_links($items, $token);
+    ppt_send_confirmation_email($customer_email, $customer_name, $items, $total, $token, $download_links, $payment_id);
+
+    return rest_ensure_response(['success' => true, 'token' => $token, 'download_links' => $download_links]);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   HELPER: Build per-item download link array
+   ────────────────────────────────────────────────────────── */
+function ppt_build_download_links( $items, $token ) {
+    global $wpdb;
+    $site_url = get_site_url();
+    $links = [];
+    foreach ( $items as $item ) {
+        $preset_id = sanitize_text_field($item['id']   ?? '');
+        $name      = sanitize_text_field($item['name'] ?? $preset_id);
+
+        // Primary: check ppt_preset_files table (uploaded via admin panel or ACF sync)
+        $file = $wpdb->get_row($wpdb->prepare(
+            "SELECT file_url, filename FROM {$wpdb->prefix}ppt_preset_files WHERE preset_id = %s", $preset_id
+        ));
+
+        // Fallback: look for a preset CPT post whose preset_id_slug ACF field matches
+        if ( empty($file->file_url) && function_exists('get_posts') ) {
+            $posts = get_posts([
+                'post_type'      => 'preset',
+                'posts_per_page' => 1,
+                'meta_query'     => [[
+                    'key'     => 'preset_id_slug',
+                    'value'   => $preset_id,
+                    'compare' => '=',
+                ]],
+            ]);
+            if ( $posts ) {
+                $zip_url = get_field('preset_zip_file', $posts[0]->ID);
+                if ( $zip_url ) {
+                    $file = (object)[
+                        'file_url' => $zip_url,
+                        'filename' => basename(parse_url($zip_url, PHP_URL_PATH)),
+                    ];
+                }
+            }
+        }
+
+        $links[] = [
+            'preset_id'    => $preset_id,
+            'name'         => $name,
+            'download_url' => "{$site_url}/wp-json/ppt/v1/download/{$token}?item=" . urlencode($preset_id),
+            'file_ready'   => ! empty($file->file_url),
+        ];
+    }
+    return $links;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   CALLBACK: Download Handler (token-gated)
+   ────────────────────────────────────────────────────────── */
+function ppt_handle_download( WP_REST_Request $request ) {
+    global $wpdb;
+
+    $token     = sanitize_text_field($request['token']);
+    $preset_id = sanitize_text_field($request->get_param('item') ?? '');
+
+    $order = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM {$wpdb->prefix}ppt_orders WHERE token = %s", $token
+    ));
+    if ( ! $order )
+        return new WP_Error('invalid_token', 'Download link is invalid', ['status' => 404]);
+
+    if ( $preset_id ) {
+        $dt = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, download_count FROM {$wpdb->prefix}ppt_download_tokens
+             WHERE order_token = %s AND preset_id = %s",
+            $token, $preset_id
+        ));
+        if ( ! $dt )
+            return new WP_Error('not_in_order', 'This preset was not part of the order', ['status' => 403]);
+
+        $file = $wpdb->get_row($wpdb->prepare(
+            "SELECT file_url FROM {$wpdb->prefix}ppt_preset_files WHERE preset_id = %s", $preset_id
+        ));
+
+        // Fallback: check ACF preset_zip_file on matching preset CPT post
+        if ( empty($file->file_url) && function_exists('get_posts') ) {
+            $posts = get_posts([
+                'post_type'      => 'preset',
+                'posts_per_page' => 1,
+                'meta_query'     => [[
+                    'key'     => 'preset_id_slug',
+                    'value'   => $preset_id,
+                    'compare' => '=',
+                ]],
+            ]);
+            if ( $posts ) {
+                $zip_url = get_field('preset_zip_file', $posts[0]->ID);
+                if ( $zip_url ) $file = (object)['file_url' => $zip_url];
+            }
+        }
+
+        if ( ! $file || ! $file->file_url )
+            return rest_ensure_response([
+                'success' => false,
+                'message' => 'File not yet available.',
+            ]);
+
+        $wpdb->update(
+            $wpdb->prefix . 'ppt_download_tokens',
+            ['download_count' => $dt->download_count + 1, 'last_downloaded' => current_time('mysql')],
+            ['id' => $dt->id], ['%d','%s'], ['%d']
+        );
+
+        wp_redirect($file->file_url, 302);
+        exit;
+    }
+
+    // No item param — return all links as JSON (for Thank You page)
+    $parsed_items = json_decode($order->items, true) ?? [];
+    $links = ppt_build_download_links($parsed_items, $token);
+
+    return rest_ensure_response([
+        'success'        => true,
+        'customer_name'  => $order->customer_name,
+        'customer_email' => $order->customer_email,
+        'items'          => $links,
+    ]);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   CALLBACK: Upload Zip (admin-only)
+   ────────────────────────────────────────────────────────── */
+function ppt_upload_zip( WP_REST_Request $request ) {
+    global $wpdb;
+
+    $preset_id = sanitize_text_field($request->get_param('preset_id') ?? '');
+    if ( ! $preset_id ) return new WP_Error('missing_preset_id', 'preset_id required', ['status' => 400]);
+    if ( empty($_FILES['file']) ) return new WP_Error('no_file', 'No file uploaded', ['status' => 400]);
+
+    $file = $_FILES['file'];
+    $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if ( $ext !== 'zip' ) return new WP_Error('invalid_type', 'Only .zip files are allowed', ['status' => 400]);
+
+    if ( ! function_exists('wp_handle_upload') ) require_once ABSPATH . 'wp-admin/includes/file.php';
+
+    add_filter('upload_dir', 'ppt_presets_upload_dir');
+    add_filter('upload_mimes', function($mimes) { $mimes['zip'] = 'application/zip'; return $mimes; });
+    $result = wp_handle_upload($file, ['test_form' => false, 'test_type' => false]);
+    remove_filter('upload_dir', 'ppt_presets_upload_dir');
+
+    if ( isset($result['error']) ) return new WP_Error('upload_error', $result['error'], ['status' => 500]);
+
+    $filename  = basename($result['file'] ?? $file['name']);
+    $file_url  = $result['url']  ?? '';
+    $file_path = $result['file'] ?? '';
+
+    $existing_id = $wpdb->get_var($wpdb->prepare(
+        "SELECT id FROM {$wpdb->prefix}ppt_preset_files WHERE preset_id = %s", $preset_id
+    ));
+
+    if ( $existing_id ) {
+        $wpdb->update(
+            $wpdb->prefix . 'ppt_preset_files',
+            ['filename' => $filename, 'file_url' => $file_url, 'file_path' => $file_path],
+            ['preset_id' => $preset_id], ['%s','%s','%s'], ['%s']
+        );
+    } else {
+        $wpdb->insert(
+            $wpdb->prefix . 'ppt_preset_files',
+            ['preset_id' => $preset_id, 'filename' => $filename, 'file_url' => $file_url, 'file_path' => $file_path],
+            ['%s','%s','%s','%s']
+        );
+    }
+
+    return rest_ensure_response(['success' => true, 'filename' => $filename, 'url' => $file_url, 'preset_id' => $preset_id]);
+}
+
+function ppt_presets_upload_dir( $dirs ) {
+    $dirs['subdir'] = '/ppt-presets';
+    $dirs['path']   = $dirs['basedir'] . '/ppt-presets';
+    $dirs['url']    = $dirs['baseurl'] . '/ppt-presets';
+    return $dirs;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   CALLBACK: List Orders (admin-only)
+   ────────────────────────────────────────────────────────── */
+function ppt_get_orders( WP_REST_Request $request ) {
+    global $wpdb;
+
+    $orders = $wpdb->get_results(
+        "SELECT o.id, o.token, o.customer_name, o.customer_email, o.customer_phone,
+                o.items, o.total, o.payment_id, o.created_at
+         FROM {$wpdb->prefix}ppt_orders o
+         ORDER BY o.created_at DESC
+         LIMIT 500"
+    );
+
+    if ( ! $orders ) return rest_ensure_response([]);
+
+    foreach ( $orders as &$order ) {
+        $tokens = $wpdb->get_results($wpdb->prepare(
+            "SELECT preset_id, download_count, last_downloaded
+             FROM {$wpdb->prefix}ppt_download_tokens WHERE order_token = %s",
+            $order->token
+        ));
+        $order->download_counts = $tokens ?: [];
+    }
+    unset($order);
+
+    return rest_ensure_response($orders);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   CALLBACK: Get Preset File metadata (admin-only)
+   ────────────────────────────────────────────────────────── */
+function ppt_get_preset_file( WP_REST_Request $request ) {
+    global $wpdb;
+
+    $preset_id = sanitize_text_field(urldecode($request['preset_id']));
+    $file = $wpdb->get_row($wpdb->prepare(
+        "SELECT filename, file_url FROM {$wpdb->prefix}ppt_preset_files WHERE preset_id = %s", $preset_id
+    ));
+
+    if ( ! $file ) return new WP_Error('not_found', 'No file found for this preset', ['status' => 404]);
+    return rest_ensure_response(['filename' => $file->filename, 'url' => $file->file_url]);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   CALLBACK: Available Presets (public — which presets have ZIPs)
+   ────────────────────────────────────────────────────────── */
+function ppt_get_available_presets( WP_REST_Request $request ) {
+    global $wpdb;
+    nocache_headers();
+
+    // Primary: IDs in ppt_preset_files table with a non-empty file_url
+    $rows = $wpdb->get_results(
+        "SELECT preset_id FROM {$wpdb->prefix}ppt_preset_files WHERE file_url IS NOT NULL AND file_url != ''"
+    );
+    $ids = array_map(function($r) { return $r->preset_id; }, $rows);
+    $id_set = array_flip($ids);
+
+    // Fallback: preset CPT posts that have a non-empty preset_zip_file ACF field
+    // and a non-empty preset_id_slug — union with table results
+    if ( function_exists('get_posts') ) {
+        $acf_posts = get_posts([
+            'post_type'      => 'preset',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => [
+                [
+                    'key'     => 'preset_zip_file',
+                    'value'   => '',
+                    'compare' => '!=',
+                ],
+            ],
+        ]);
+        foreach ( $acf_posts as $p ) {
+            $slug = trim((string) get_field('preset_id_slug', $p->ID));
+            if ( $slug && ! isset($id_set[$slug]) ) {
+                $ids[] = $slug;
+                $id_set[$slug] = true;
+            }
+        }
+    }
+
+    $response = new WP_REST_Response(['available' => array_values($ids)]);
+    $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    $response->header('Pragma', 'no-cache');
+    $response->header('Expires', '0');
+    return $response;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   EMAIL: Premium branded confirmation with ZIP download cards
+   ────────────────────────────────────────────────────────── */
+function ppt_send_confirmation_email( $to, $name, $items, $total, $token, $download_links, $payment_id = '' ) {
+    $brand_name   = 'Picture Perfect Tones';
+    $from_email   = 'pictureperfecttones@pictureperfecttones.com';
+    $subject      = 'Your Presets Are Ready to Download — ' . $brand_name;
+    $support_url  = 'https://wa.me/918962801172';
+    $total_fmt    = '&#8377;' . number_format($total, 0, '.', ',');
+    $order_ref    = $payment_id ? $payment_id : strtoupper(substr($token, 0, 16));
+
+    /* ── Per-preset download cards ── */
+    $cards_html = '';
+    foreach ( $download_links as $link ) {
+        $cards_html .= '
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid #EDE6DA;">
+          <tr>
+            <td style="background:#FFFAF4;border-left:4px solid #B08D5B;padding:20px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <p style="margin:0 0 3px;font-family:Georgia,serif;font-size:16px;color:#2C2825;font-weight:bold;">'
+                        . esc_html($link['name']) . '</p>
+                    <p style="margin:0;font-size:11px;color:#9A9088;letter-spacing:0.1em;text-transform:uppercase;">
+                        Lightroom Preset Pack &middot; XMP</p>
+                  </td>
+                </tr>
+                <tr><td style="padding-top:16px;">
+                  <a href="' . esc_url($link['download_url']) . '"
+                     style="display:inline-block;background:#B08D5B;color:#ffffff;
+                            padding:13px 32px;border-radius:6px;text-decoration:none;
+                            font-size:14px;font-weight:700;letter-spacing:0.06em;">
+                    &#8675;&nbsp; Download ZIP
+                  </a>
+                </td></tr>
+                <tr><td style="padding-top:10px;">
+                  <p style="margin:0;font-size:11px;color:#B0A89E;">
+                    Link is permanent — save this email to re-download anytime.</p>
+                </td></tr>
+              </table>
+            </td>
+          </tr>
+        </table>';
+    }
+
+    /* ── How-to steps ── */
+    $steps = [
+        ['01', 'Open Adobe Lightroom', 'Desktop or Mobile app — both are supported.'],
+        ['02', 'Import the preset file', 'Go to Presets panel &rarr; click + &rarr; Import Presets &rarr; select your downloaded XMP file.'],
+        ['03', 'Apply &amp; customise', 'Click any preset to apply it. Adjust Exposure or White Balance to suit your shot.'],
+    ];
+    $steps_html = '';
+    foreach ( $steps as $step ) {
+        $steps_html .= '
+        <tr>
+          <td valign="top" style="width:36px;padding:0 14px 20px 0;">
+            <div style="width:32px;height:32px;background:#B08D5B;border-radius:50%;
+                        text-align:center;line-height:32px;font-size:11px;font-weight:700;
+                        color:#ffffff;font-family:Arial,sans-serif;">' . $step[0] . '</div>
+          </td>
+          <td style="padding-bottom:20px;">
+            <p style="margin:0 0 2px;font-size:14px;font-weight:700;color:#2C2825;">' . $step[1] . '</p>
+            <p style="margin:0;font-size:13px;color:#7A6E67;line-height:1.6;">' . $step[2] . '</p>
+          </td>
+        </tr>';
+    }
+
+    $body = '<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>' . esc_html($brand_name) . ' — Order Confirmed</title>
+</head>
+<body style="margin:0;padding:0;background:#F2EDE4;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F2EDE4;">
+<tr><td align="center" style="padding:40px 16px 60px;">
+
+  <!-- ═══ Outer card ═══ -->
+  <table width="600" cellpadding="0" cellspacing="0"
+         style="background:#ffffff;border-radius:16px;overflow:hidden;
+                box-shadow:0 8px 40px rgba(0,0,0,0.10);">
+
+    <!-- ── Header ── -->
+    <tr>
+      <td style="background:#1C1714;padding:0;text-align:center;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="background:linear-gradient(135deg,#B08D5B 0%,#8C6C3E 100%);
+                       padding:36px 44px 32px;text-align:center;">
+              <p style="margin:0 0 6px;font-family:Georgia,serif;font-size:11px;
+                         letter-spacing:0.35em;text-transform:uppercase;color:rgba(255,255,255,0.65);">
+                Picture Perfect Tones</p>
+              <p style="margin:0 0 20px;font-family:Georgia,serif;font-size:30px;
+                         color:#ffffff;font-weight:normal;line-height:1.2;">
+                Your Presets Are Ready</p>
+              <span style="display:inline-block;background:rgba(255,255,255,0.18);
+                           border:1px solid rgba(255,255,255,0.4);
+                           color:#ffffff;font-size:11px;font-weight:700;
+                           letter-spacing:0.2em;text-transform:uppercase;
+                           padding:6px 18px;border-radius:20px;">
+                &#10003;&nbsp; Payment Confirmed
+              </span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- ── Greeting ── -->
+    <tr>
+      <td style="padding:36px 44px 8px;">
+        <p style="margin:0 0 10px;font-family:Georgia,serif;font-size:21px;color:#2C2825;">
+          Hello, ' . esc_html($name) . '!</p>
+        <p style="margin:0;font-size:14px;color:#5A544D;line-height:1.8;">
+          Thank you for your purchase. Your Lightroom preset pack(s) are ready to download
+          — simply click the button below each preset to save the ZIP file to your device.</p>
+      </td>
+    </tr>
+
+    <!-- ── Gold divider ── -->
+    <tr>
+      <td style="padding:24px 44px 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="border-top:2px solid #B08D5B;font-size:0;">&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- ── Download cards ── -->
+    <tr>
+      <td style="padding:0 44px 8px;">
+        <p style="margin:0 0 16px;font-size:11px;font-weight:700;letter-spacing:0.2em;
+                   text-transform:uppercase;color:#9A9088;">Your Downloads</p>
+        ' . $cards_html . '
+      </td>
+    </tr>
+
+    <!-- ── Divider ── -->
+    <tr>
+      <td style="padding:16px 44px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="border-top:1px solid #EDE6DA;font-size:0;">&nbsp;</td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- ── How to use ── -->
+    <tr>
+      <td style="padding:0 44px 8px;">
+        <p style="margin:0 0 20px;font-size:11px;font-weight:700;letter-spacing:0.2em;
+                   text-transform:uppercase;color:#9A9088;">How to Use Your Presets</p>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          ' . $steps_html . '
+        </table>
+      </td>
+    </tr>
+
+    <!-- ── Divider ── -->
+    <tr>
+      <td style="padding:8px 44px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="border-top:1px solid #EDE6DA;font-size:0;">&nbsp;</td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- ── Order summary ── -->
+    <tr>
+      <td style="padding:0 44px 32px;">
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="background:#FFFAF4;border-radius:10px;border:1px solid #EDE6DA;">
+          <tr>
+            <td style="padding:20px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="font-size:12px;color:#9A9088;text-transform:uppercase;
+                              letter-spacing:0.1em;padding-bottom:12px;">Order Summary</td>
+                </tr>
+                <tr>
+                  <td style="font-size:13px;color:#5A544D;padding-bottom:6px;">Order Reference</td>
+                  <td align="right" style="font-size:13px;color:#2C2825;font-weight:700;
+                                            padding-bottom:6px;font-family:monospace;
+                                            letter-spacing:0.08em;">#' . esc_html($order_ref) . '</td>
+                </tr>
+                <tr>
+                  <td style="border-top:1px solid #EDE6DA;font-size:0;padding-top:12px;">&nbsp;</td>
+                  <td style="border-top:1px solid #EDE6DA;font-size:0;padding-top:12px;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td style="font-size:13px;color:#5A544D;padding-top:4px;">Total Paid</td>
+                  <td align="right" style="font-family:Georgia,serif;font-size:24px;
+                                            color:#2C2825;padding-top:4px;">' . $total_fmt . '</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- ── Support ── -->
+    <tr>
+      <td style="padding:0 44px 36px;text-align:center;">
+        <p style="margin:0;font-size:13px;color:#7A6E67;line-height:1.8;">
+          Need help applying your presets?<br>
+          <a href="' . esc_url($support_url) . '"
+             style="color:#B08D5B;text-decoration:none;font-weight:700;">
+            Chat with us on WhatsApp</a>
+          &nbsp;&mdash;&nbsp;we respond within 24 hours.
+        </p>
+      </td>
+    </tr>
+
+    <!-- ── Footer ── -->
+    <tr>
+      <td style="background:#1C1714;padding:24px 44px;text-align:center;">
+        <p style="margin:0 0 6px;font-family:Georgia,serif;font-size:13px;color:#B08D5B;
+                   letter-spacing:0.15em;text-transform:uppercase;">Picture Perfect Tones</p>
+        <p style="margin:0 0 8px;font-size:11px;color:#7A6E67;">
+          Handcrafted Lightroom Presets for Indian Wedding Photography</p>
+        <p style="margin:0;font-size:10px;color:#5A544D;line-height:1.6;">
+          Questions? Email us at <a href="mailto:pictureperfecttone@gmail.com" style="color:#B08D5B;">pictureperfecttone@gmail.com</a><br>
+          You received this email because you placed an order on pictureperfecttones.com.<br>
+          This is a transactional email — your download links are inside.
+        </p>
+      </td>
+    </tr>
+
+  </table>
+  <!-- ═══ End outer card ═══ -->
+
+</td></tr>
+</table>
+
+</body>
+</html>';
+
+    /* ── Plain-text alternative (avoids spam filters) ── */
+    $plain_links = '';
+    foreach ( $download_links as $link ) {
+        $plain_links .= '  ' . $link['name'] . "\n  " . $link['download_url'] . "\n\n";
+    }
+    $body_text = "Hello, {$name}!\n\n"
+        . "Thank you for your purchase from {$brand_name}.\n"
+        . "Your Lightroom preset pack(s) are ready to download.\n\n"
+        . "---\n"
+        . "ORDER REFERENCE: #{$order_ref}\n"
+        . "TOTAL PAID: " . html_entity_decode($total_fmt, ENT_HTML5, 'UTF-8') . "\n"
+        . "---\n\n"
+        . "YOUR DOWNLOADS\n\n"
+        . $plain_links
+        . "Links are permanent — save this email to re-download anytime.\n\n"
+        . "---\n"
+        . "HOW TO USE YOUR PRESETS\n\n"
+        . "01. Open Adobe Lightroom (Desktop or Mobile — both are supported).\n"
+        . "02. Go to Presets panel > click + > Import Presets > select your XMP file.\n"
+        . "03. Click any preset to apply it. Adjust Exposure or White Balance to suit your shot.\n\n"
+        . "---\n"
+        . "Need help? Chat with us on WhatsApp: {$support_url}\n"
+        . "We respond within 24 hours.\n\n"
+        . "---\n"
+        . "{$brand_name} | Handcrafted Lightroom Presets for Indian Wedding Photography\n"
+        . "Questions? Email us at pictureperfecttone@gmail.com\n"
+        . "You received this email because you placed an order on pictureperfecttones.com.\n";
+
+    /* ── Attach plain-text alternative via PHPMailer ── */
+    $ppt_alt_body_cb = null;
+    $ppt_alt_body_cb = function ( $phpmailer ) use ( $body_text, &$ppt_alt_body_cb ) {
+        $phpmailer->AltBody = $body_text;
+        remove_action( 'phpmailer_init', $ppt_alt_body_cb );
+    };
+    add_action( 'phpmailer_init', $ppt_alt_body_cb );
+
+    $headers = [
+        'Content-Type: text/html; charset=UTF-8',
+        "Reply-To: {$from_email}",
+        "From: {$brand_name} <{$from_email}>",
+        "List-Unsubscribe: <mailto:{$from_email}?subject=Unsubscribe>",
+    ];
+
+    return wp_mail($to, $subject, $body, $headers);
+}
+
+/* ============================================================
+   END PicturePerfectTones — Complete CMS Setup  v8
+   ============================================================ */

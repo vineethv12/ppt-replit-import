@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { hasApi, fetchAll } from "../lib/api";
+import { hasApi, fetchAll, fetchAvailablePresets } from "../lib/api";
 
-const LS_KEY = "pp_content_v1";
+const LS_KEY = "pp_content_v3";
 
 export const DEFAULT_CONTENT = {
   baPairs: [
@@ -18,7 +18,7 @@ export const DEFAULT_CONTENT = {
       mood: ["Soft", "Ethereal", "Luminous"],
       tagline: "For stories told in whispers and light.",
       description: "Film-like luminosity for photographers who live for soft candlelight and intimate moments. Skin tones glow, whites stay clean, and every frame feels like it was shot on medium format.",
-      includes: ["12 Lightroom Presets", "Mobile DNG Profiles", "One-Click Apply", "Free Lifetime Updates"],
+      includes: ["12 Lightroom Presets", "Lightroom Mobile Compatible", "One-Click Apply", "Free Lifetime Updates"],
       price: "₹3,999",
       images: { hero: "/images/c-ivory-bride.jpg", mid: "/images/c-ivory-stairs.jpg", sm: "/images/c-ivory-couple.jpg", alt: "/images/c-ivory-walk.jpg" },
       accent: "rgba(230,210,180,0.12)", flip: false,
@@ -28,7 +28,7 @@ export const DEFAULT_CONTENT = {
       mood: ["Dramatic", "Regal", "Bold"],
       tagline: "Where every frame commands the room.",
       description: "Built for the richness of traditional Indian ceremonies. Deep reds stay true, gold embroidery gleams, and the grandeur of a lehenga fills every corner of the frame.",
-      includes: ["14 Lightroom Presets", "Camera Raw Profiles", "Mobile DNG Profiles", "Wedding Day Workflow Guide"],
+      includes: ["14 Lightroom Presets", "Camera Raw Profiles", "Lightroom Mobile Compatible", "Wedding Day Workflow Guide"],
       price: "₹4,499",
       images: { hero: "/images/c-red-twirl.jpg", mid: "/images/c-red-seated.webp", sm: "/images/c-red-bride.webp", alt: "/images/c-jewelry.jpg" },
       accent: "rgba(160,40,40,0.1)", flip: true,
@@ -56,7 +56,7 @@ export const DEFAULT_CONTENT = {
     ivory: {
       name: "The Ivory Edit", tagline: "Soft, ethereal luminosity for intimate moments",
       description: "Film-like luminosity that keeps whites luminous, skin tones warm, and shadows open. Built for candlelit halls, morning ghee rituals, and the quiet moments between the ceremony.",
-      price: "₹3,999", badge: null, style: "Soft · Warm · Luminous", count: 12, format: "XMP + DNG", compat: "Lightroom Mobile & Desktop",
+      price: "₹3,999", badge: null, style: "Soft · Warm · Luminous", count: 12, format: "XMP", compat: "Lightroom Mobile & Desktop",
       hero: "/images/c-ivory-bride.jpg",
       pairs: [{ img: "/images/c-ivory-bride.jpg" }, { img: "/images/c-ivory-stairs.jpg" }, { img: "/images/c-ivory-walk.jpg" }],
       gallery: ["/images/c-ivory-couple.jpg", "/images/photo-2.jpg", "/images/photo-3.jpg", "/images/photo-4.jpg", "/images/photo-5.jpg", "/images/photo-6.jpg"],
@@ -64,7 +64,7 @@ export const DEFAULT_CONTENT = {
     crimson: {
       name: "The Crimson Edit", tagline: "Dramatic, regal richness for traditional ceremonies",
       description: "Deep reds stay commanding, not muddy. Gold embroidery gleams. Skin tones stay accurate across every complexion. Built for the visual abundance of Indian bridal fashion.",
-      price: "₹4,499", badge: "Bestseller", style: "Dramatic · Regal · Moody", count: 14, format: "XMP + DNG", compat: "Lightroom Mobile & Desktop",
+      price: "₹4,499", badge: "Bestseller", style: "Dramatic · Regal · Moody", count: 14, format: "XMP", compat: "Lightroom Mobile & Desktop",
       hero: "/images/c-red-twirl.jpg",
       pairs: [{ img: "/images/c-red-twirl.jpg" }, { img: "/images/c-red-seated.webp" }, { img: "/images/c-red-bride.webp" }],
       gallery: ["/images/c-sikhwedding.webp", "/images/c-mandap.jpg", "/images/photo-7.jpg", "/images/photo-8.jpg", "/images/photo-1.webp", "/images/c-jewelry.jpg"],
@@ -72,7 +72,7 @@ export const DEFAULT_CONTENT = {
     heritage: {
       name: "The Heritage Edit", tagline: "Cinematic warmth for palaces and heritage venues",
       description: "Inspired by Rajputana forts and candlelit mandaps. Rich shadows, honeyed highlights, and a cinematic depth that makes every frame feel like a film still.",
-      price: "₹5,499", badge: "New", style: "Cinematic · Warm · Timeless", count: 16, format: "XMP + DNG", compat: "Lightroom Mobile & Desktop",
+      price: "₹5,499", badge: "New", style: "Cinematic · Warm · Timeless", count: 16, format: "XMP", compat: "Lightroom Mobile & Desktop",
       hero: "/images/c-sofa-bride.jpg",
       pairs: [{ img: "/images/c-sofa-bride.jpg" }, { img: "/images/c-window.jpg" }, { img: "/images/c-mandap.jpg" }],
       gallery: ["/images/c-jewelry.jpg", "/images/photo-6.jpg", "/images/photo-7.jpg", "/images/photo-8.jpg", "/images/photo-2.jpg", "/images/c-ivory-stairs.jpg"],
@@ -80,7 +80,7 @@ export const DEFAULT_CONTENT = {
     celebration: {
       name: "The Celebration Edit", tagline: "Vivid, joyful, true-to-life colour",
       description: "Vibrant tones without blowing out skies or pushing colours into neon. Perfect for open-air ceremonies, mehndi afternoons, and the colour-drenched energy of sangeet nights.",
-      price: "₹3,499", badge: null, style: "Vivid · Joyful · Radiant", count: 10, format: "XMP + DNG", compat: "Lightroom Mobile & Desktop",
+      price: "₹3,499", badge: null, style: "Vivid · Joyful · Radiant", count: 10, format: "XMP", compat: "Lightroom Mobile & Desktop",
       hero: "/images/c-celebration.jpg",
       pairs: [{ img: "/images/c-celebration.jpg" }, { img: "/images/c-garden-couple.jpg" }, { img: "/images/c-sikhwedding.webp" }],
       gallery: ["/images/photo-1.webp", "/images/photo-2.jpg", "/images/photo-3.jpg", "/images/photo-4.jpg", "/images/photo-5.jpg", "/images/c-ivory-walk.jpg"],
@@ -88,7 +88,7 @@ export const DEFAULT_CONTENT = {
     golden: {
       name: "The Golden Hour Edit", tagline: "Honeyed light and sunlit warmth",
       description: "Captures the magic of couples shooting at dusk — the long shadows, warm skies, and a glow that makes every frame feel like a memory you never want to let go.",
-      price: "₹3,999", badge: null, style: "Warm · Glowing · Sunlit", count: 12, format: "XMP + DNG", compat: "Lightroom Mobile & Desktop",
+      price: "₹3,999", badge: null, style: "Warm · Glowing · Sunlit", count: 12, format: "XMP", compat: "Lightroom Mobile & Desktop",
       hero: "/images/c-garden-couple.jpg",
       pairs: [{ img: "/images/c-garden-couple.jpg" }, { img: "/images/c-ivory-walk.jpg" }, { img: "/images/c-ivory-stairs.jpg" }],
       gallery: ["/images/photo-4.jpg", "/images/photo-5.jpg", "/images/photo-6.jpg", "/images/photo-7.jpg", "/images/photo-8.jpg", "/images/c-celebration.jpg"],
@@ -96,7 +96,7 @@ export const DEFAULT_CONTENT = {
     portrait: {
       name: "The Portrait Edit", tagline: "Clean skin tones, natural detail",
       description: "Every skin tone, rendered faithfully. Every jewellery detail, sharp and true. A versatile preset that elevates without overwhelming — the one you'll reach for every single session.",
-      price: "₹2,999", badge: null, style: "Clean · Natural · Faithful", count: 8, format: "XMP + DNG", compat: "Lightroom Mobile & Desktop",
+      price: "₹2,999", badge: null, style: "Clean · Natural · Faithful", count: 8, format: "XMP", compat: "Lightroom Mobile & Desktop",
       hero: "/images/c-ivory-couple.jpg",
       pairs: [{ img: "/images/c-ivory-couple.jpg" }, { img: "/images/c-ivory-bride.jpg" }, { img: "/images/c-jewelry.jpg" }],
       gallery: ["/images/photo-7.jpg", "/images/photo-8.jpg", "/images/photo-1.webp", "/images/photo-2.jpg", "/images/c-window.jpg", "/images/c-red-bride.webp"],
@@ -128,6 +128,13 @@ export const DEFAULT_CONTENT = {
     { id: 23, type: "reel",  src: "/videos/reel-1.mp4",                  alt: "Each photo is a blank canvas",aspect: "reel" },
     { id: 24, type: "photo", src: "/images/photo-1.webp",                alt: "Wedding portrait",            aspect: "tall" },
   ],
+  filterLabels: {
+    wedding: "Wedding",
+    cinematic: "Cinematic",
+    warm: "Warm",
+    moody: "Moody",
+    portrait: "Portrait",
+  },
   featuredVideoId: "mZTw7twXRvk",
   videos: [
     { id: "hrhUr8-jZcw", title: "Cinematic Colour Grade",   desc: "The tone curve workflow behind every preset",      cat: "Lightroom Edits" },
@@ -152,17 +159,27 @@ const ContentContext = createContext(null);
 
 export function ContentProvider({ children }) {
   const [content, setContent] = useState(loadContent);
+  const [availablePresets, setAvailablePresets] = useState(null);
 
   useEffect(() => {
     if (!hasApi()) return;
     fetchAll()
       .then((data) => {
         setContent((prev) => {
-          const next = { ...prev, ...data };
+          const next = { ...prev };
+          Object.entries(data).forEach(([key, val]) => {
+            if (Array.isArray(val) && val.length === 0) return;
+            if (val && typeof val === "object" && !Array.isArray(val) && Object.keys(val).length === 0) return;
+            next[key] = val;
+          });
           try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {}
           return next;
         });
       })
+      .catch(() => {});
+
+    fetchAvailablePresets()
+      .then((ids) => setAvailablePresets(ids))
       .catch(() => {});
   }, []);
 
@@ -180,7 +197,7 @@ export function ContentProvider({ children }) {
   }, []);
 
   return (
-    <ContentContext.Provider value={{ content, updateContent, resetContent }}>
+    <ContentContext.Provider value={{ content, updateContent, resetContent, availablePresets }}>
       {children}
     </ContentContext.Provider>
   );
